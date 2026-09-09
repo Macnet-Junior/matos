@@ -10,7 +10,7 @@ export default function LoginPage() {
           </div>
           <div>
             <h1 className="text-lg font-semibold tracking-tight">MatOS</h1>
-            <p className="text-xs text-matos-muted2">Dev sign-in · Phase 0</p>
+            <p className="text-xs text-matos-muted2">Dev sign-in · Phase 1</p>
           </div>
         </div>
         <AuthForm />
