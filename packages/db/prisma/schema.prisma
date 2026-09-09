@@ -180,3 +180,41 @@ model UserRole {
 
   @@index([role])
 }
+
+/// External channel connection (Late / Etsy / WhatsApp). One row per provider.
+model IntegrationAccount {
+  id          String   @id @default(cuid())
+  /// late | etsy | whatsapp
+  provider    String   @unique
+  label       String   @default("")
+  /// connected | disconnected | error
+  status      String   @default("disconnected")
+  externalId  String?
+  /// JSON metadata (non-secret): shop name, profile count, allowed destination label, etc.
+  metaJson    String   @default("{}")
+  lastError   String?
+  connectedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  credentials IntegrationCredential[]
+
+  @@index([status])
+}
+
+/// Encrypted credential blob — never log plaintext.
+model IntegrationCredential {
+  id         String   @id @default(cuid())
+  accountId  String
+  account    IntegrationAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  /// api_key | access_token | refresh_token | shared_secret | code_verifier | state
+  kind       String
+  ciphertext String
+  iv         String
+  authTag    String
+  expiresAt  DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([accountId, kind])
+  @@index([accountId])
+}

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { channelStubs } from "@/lib/workflows";
+import { listChannelStatus } from "@/lib/integrations/accounts";
 
 export const dynamic = "force-dynamic";
 
@@ -9,5 +9,6 @@ export async function GET() {
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  return NextResponse.json({ channels: channelStubs() });
+  const channels = await listChannelStatus();
+  return NextResponse.json({ channels });
 }

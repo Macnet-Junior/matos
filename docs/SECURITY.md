@@ -11,7 +11,8 @@
 | Secret | Where | Notes |
 |---|---|---|
 | `AUTH_SECRET` | Server env only | Required by Auth.js. Generate with `openssl rand -base64 32`. Never commit `.env.local`. |
-| Provider keys | Deferred (Phase 4b) | No Late.dev / Etsy / WhatsApp / Stripe keys in repo. |
+| Provider keys | Server env + encrypted DB | Late / Etsy / WhatsApp via env or `IntegrationCredential` (AES-256-GCM). Never commit real keys. Stripe still deferred. |
+| `CREDENTIALS_SECRET` | Server env only | Encrypts stored integration secrets. |
 
 `.env.example` documents variable names only — placeholder values only.
 
@@ -65,8 +66,18 @@ Sensitive POSTs (map/skill/workflow mutations, runs, gate advances, activity exp
 - [ ] Enable HTTPS only; set secure cookie flags
 - [ ] Dependency audit (`pnpm audit`) clean for criticals
 - [ ] No sample passwords accepted in production builds
-- [ ] Live channel / spend actions behind Owner + review gate (Phase 4b)
+- [x] Live channel actions behind Owner connect + review gate (Phase 4b scaffolding)
+- [x] WhatsApp destination hard allowlist (`WHATSAPP_GROUP_OR_TO` only)
+- [ ] Stripe / spend actions
 
 ## Reporting
 
 Security issues: contact the repo owner (Macnet Junior) privately. Do not open public issues with exploit details.
+
+
+## Phase 4b credentials & WhatsApp allowlist
+
+- Integration secrets are encrypted at rest (`apps/web/src/lib/integrations/credentials.ts`) and never returned to the client after save (masked hint only).
+- Do not log decrypted secrets or raw `Authorization` headers containing user keys.
+- WhatsApp Cloud sends are **hard-bound** to `WHATSAPP_GROUP_OR_TO` (Career path / content creation monetization). Any other `to` is rejected in code.
+- WhatsApp send API requires `workflow:approve` permission and `reviewGateApproved: true`.

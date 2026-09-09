@@ -20,7 +20,7 @@ import type {
   WorkflowRunSummaryDTO,
   WorkflowStepDTO,
   HomeDigestDTO,
-  ChannelStubDTO,
+  ChannelDTO,
 } from "./types";
 import { toActivityDTO } from "./map-data";
 import {
@@ -260,6 +260,179 @@ function buildDryArtifact(skill: Skill, gate: ContentGate) {
   };
 }
 
+
+async function attemptChannelPublish(input: {
+  skillSlug: string;
+  gate: ContentGate;
+  skillTitle: string;
+  purpose: string;
+}): Promise<{
+  logs: Array<{ level: string; message: string }>;
+  artifact: Record<string, unknown>;
+}> {
+  const logs: Array<{ level: string; message: string }> = [];
+  const artifact: Record<string, unknown> = {
+    simulatedPublish: true,
+    channels: [] as string[],
+    externalPost: false,
+  };
+
+  if (!canSimulatePublish(input.gate)) {
+    logs.push({
+      level: "warn",
+      message: `Publish skipped — gate is ${input.gate}`,
+    });
+    return { logs, artifact };
+  }
+
+  // Late.dev schedule attempt for scheduler / channel skills
+  const lateSkills = new Set(["scheduler", "channel-connect", "native-adapt"]);
+  if (lateSkills.has(input.skillSlug)) {
+    try {
+      const { resolveLateApiKey, isLateConnected } = await import(
+        "./integrations/accounts"
+      );
+      const { LateClient, simulateLateSchedule, lateApiBase } = await import(
+        "./integrations/late"
+      );
+      const connected = await isLateConnected();
+      const { key } = await resolveLateApiKey();
+      const content =
+        input.purpose?.trim() ||
+        `MatOS publish: ${input.skillTitle} (${input.skillSlug})`;
+
+      if (connected && key) {
+        try {
+          const client = new LateClient({ apiKey: key, baseUrl: lateApiBase() });
+          const profiles = await client.listProfiles();
+          const profileId = profiles[0]?._id;
+          const accounts = await client.listAccounts();
+          const account = accounts.find((a) => a.isActive !== false) ?? accounts[0];
+          if (profileId && account) {
+            const result = await client.createPost({
+              content,
+              scheduledFor: new Date(Date.now() + 3600_000).toISOString(),
+              timezone: "America/New_York",
+              platforms: [
+                { platform: account.platform, accountId: account._id },
+              ],
+            });
+            logs.push({
+              level: "info",
+              message: `Late.dev scheduled post ${result.post?._id ?? "(ok)"}`,
+            });
+            artifact.simulatedPublish = false;
+            artifact.externalPost = true;
+            artifact.late = result;
+            (artifact.channels as string[]).push("late-dev");
+          } else {
+            const sim = simulateLateSchedule({
+              content,
+              reason:
+                "Late connected but no profile/account yet — simulated schedule",
+            });
+            logs.push({
+              level: "info",
+              message: sim.message ?? "Simulated Late schedule",
+            });
+            artifact.late = sim;
+            (artifact.channels as string[]).push("late-dev:simulated");
+          }
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "Late API error";
+          logs.push({
+            level: "warn",
+            message: `Late live call failed (${msg}) — falling back to simulated`,
+          });
+          const sim = simulateLateSchedule({ content, reason: msg });
+          artifact.late = sim;
+          (artifact.channels as string[]).push("late-dev:simulated");
+        }
+      } else {
+        const sim = simulateLateSchedule({
+          content,
+          reason:
+            "Late.dev not connected — simulated schedule (connect API key on Channels)",
+        });
+        logs.push({
+          level: "info",
+          message: sim.message ?? "Simulated Late schedule",
+        });
+        artifact.late = sim;
+        (artifact.channels as string[]).push("late-dev:simulated");
+      }
+    } catch (err) {
+      logs.push({
+        level: "warn",
+        message: `Late publish path error: ${err instanceof Error ? err.message : "unknown"}`,
+      });
+    }
+  }
+
+  // Etsy draft stub for etsy-publish
+  if (input.skillSlug === "etsy-publish") {
+    const { draftFromListingLab, simulateEtsyDraft } = await import(
+      "./integrations/etsy"
+    );
+    const draft = draftFromListingLab({
+      title: input.skillTitle,
+      description: input.purpose,
+    });
+    const result = simulateEtsyDraft(draft);
+    logs.push({
+      level: "info",
+      message: result.simulated
+        ? "Etsy draft listing simulated (connect OAuth for live draft)"
+        : `Etsy draft listing ${result.listing_id}`,
+    });
+    artifact.etsy = result;
+    (artifact.channels as string[]).push(
+      result.simulated ? "etsy:simulated" : "etsy",
+    );
+  }
+
+  // WhatsApp — never send without allowlist + gate (simulate only in dry-run)
+  if (input.skillSlug === "whatsapp-drop") {
+    const { whatsappConfigFromEnv, simulateWhatsAppSend } = await import(
+      "./integrations/whatsapp"
+    );
+    const cfg = whatsappConfigFromEnv();
+    const dest = cfg.allowedTo ?? "";
+    const result = simulateWhatsAppSend({
+      to: dest || "__missing__",
+      text: input.purpose?.trim() || `MatOS: ${input.skillTitle}`,
+      allowedTo: cfg.allowedTo,
+      reviewGateApproved: canSimulatePublish(input.gate),
+    });
+    if (result.ok) {
+      logs.push({
+        level: "info",
+        message: result.simulated
+          ? `WhatsApp simulated send to allowlisted destination only`
+          : `WhatsApp sent ${result.messageId}`,
+      });
+    } else {
+      logs.push({
+        level: "warn",
+        message: result.error ?? "WhatsApp send blocked",
+      });
+    }
+    artifact.whatsapp = result;
+    (artifact.channels as string[]).push(
+      result.ok ? "whatsapp:simulated" : "whatsapp:blocked",
+    );
+  }
+
+  if (!(artifact.channels as string[]).length) {
+    logs.push({
+      level: "info",
+      message: "Simulated publish artifact written (no external API call)",
+    });
+  }
+
+  return { logs, artifact };
+}
+
 /**
  * Execute a workflow as a dry-run: create run + step through skills,
  * write JSON logs/artifacts, never post externally.
@@ -353,17 +526,20 @@ export async function executeDryRun(input: {
 
     const artifact = buildDryArtifact(step.skill, gate);
     if (publishIntent) {
-      logs.push({
-        t: new Date().toISOString(),
-        level: "info",
-        message:
-          "Simulated publish artifact written (no external API call)",
+      const publishResult = await attemptChannelPublish({
+        skillSlug: step.skill.slug,
+        gate,
+        skillTitle: step.skill.title,
+        purpose: step.skill.purpose,
       });
-      Object.assign(artifact, {
-        simulatedPublish: true,
-        channels: [],
-        externalPost: false,
-      });
+      for (const line of publishResult.logs) {
+        logs.push({
+          t: new Date().toISOString(),
+          level: line.level,
+          message: line.message,
+        });
+      }
+      Object.assign(artifact, publishResult.artifact);
     } else {
       logs.push({
         t: new Date().toISOString(),
@@ -573,28 +749,73 @@ export async function loadHomeDigest(): Promise<HomeDigestDTO> {
   };
 }
 
-export function channelStubs(): ChannelStubDTO[] {
+export async function listChannels(): Promise<ChannelDTO[]> {
+  const { listChannelStatus } = await import("./integrations/accounts");
+  return listChannelStatus();
+}
+
+/** @deprecated Prefer listChannels() — sync stub for static SSR fallback */
+export function channelStubs(): ChannelDTO[] {
   return [
     {
       id: "late-dev",
       name: "Late.dev",
       status: "disconnected",
-      note: "Social publishing partner. OAuth + schedule API land in Phase 4.",
-      phase: "Connect in Phase 4",
+      note: "Social publishing partner. Connect API key in Phase 4b.",
+      phase: "Phase 4b",
+      connectMode: "api_key",
+      maskedHint: null,
+      lastError: null,
+      externalId: null,
+      meta: {},
+      coverage: {
+        api: "disconnected",
+        scheduled: "handoff",
+        handoff: "available",
+        disconnected: "yes",
+      },
+      allowedDestination: null,
     },
     {
       id: "etsy",
       name: "Etsy",
       status: "disconnected",
-      note: "Listing drafts stay local. Live marketplace API deferred to Phase 4.",
-      phase: "Connect in Phase 4",
+      note: "OAuth + draft listings in Phase 4b.",
+      phase: "Phase 4b",
+      connectMode: "oauth",
+      maskedHint: null,
+      lastError: null,
+      externalId: null,
+      meta: {},
+      coverage: {
+        api: "disconnected",
+        scheduled: "handoff",
+        handoff: "available",
+        disconnected: "yes",
+      },
+      allowedDestination: null,
     },
     {
       id: "whatsapp",
       name: "WhatsApp",
       status: "disconnected",
-      note: "When live later: only group Career path and content creation monetization — no broad broadcast automation.",
-      phase: "Connect in Phase 4",
+      note: "Career path / content creation monetization only.",
+      phase: "Phase 4b",
+      connectMode: "env",
+      maskedHint: null,
+      lastError: null,
+      externalId: null,
+      meta: {},
+      coverage: {
+        api: "disconnected",
+        scheduled: "n/a",
+        handoff: "available",
+        disconnected: "yes",
+      },
+      allowedDestination: {
+        id: null,
+        label: "Career path and content creation monetization",
+      },
     },
   ];
 }

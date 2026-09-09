@@ -26,6 +26,8 @@ export type {
   WorkflowRun,
   RunStep,
   UserRole,
+  IntegrationAccount,
+  IntegrationCredential,
 } from "@prisma/client";
 
 export function parseJsonArray(raw: string): string[] {

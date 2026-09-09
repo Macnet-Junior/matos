@@ -210,10 +210,38 @@ export interface HomeDigestDTO {
   runCount: number;
 }
 
+export type ChannelProvider = "late-dev" | "etsy" | "whatsapp";
+export type ChannelStatus = "connected" | "disconnected" | "error";
+
+export type CoverageCell = "ready" | "handoff" | "gated" | "disconnected" | "available" | "n/a" | "yes";
+
+export interface ChannelCoverage {
+  api: CoverageCell;
+  scheduled: CoverageCell;
+  handoff: CoverageCell;
+  disconnected: CoverageCell;
+}
+
+/** @deprecated Use ChannelDTO */
 export interface ChannelStubDTO {
   id: string;
   name: string;
-  status: "disconnected";
+  status: ChannelStatus;
   note: string;
   phase: string;
+}
+
+export interface ChannelDTO {
+  id: ChannelProvider;
+  name: string;
+  status: ChannelStatus;
+  note: string;
+  phase: string;
+  connectMode: "api_key" | "oauth" | "env";
+  maskedHint: string | null;
+  lastError: string | null;
+  externalId: string | null;
+  meta: Record<string, unknown>;
+  coverage: ChannelCoverage;
+  allowedDestination: { id: string | null; label: string } | null;
 }

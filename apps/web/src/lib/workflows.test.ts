@@ -78,3 +78,13 @@ describe("workflow validation", () => {
     expect(parsed.success).toBe(true);
   });
 });
+
+describe("publish gate enforcement (phase 4b)", () => {
+  it("requires approved+ before simulated publish path", () => {
+    expect(canSimulatePublish("draft")).toBe(false);
+    expect(canSimulatePublish("warm")).toBe(false);
+    expect(canSimulatePublish("approved")).toBe(true);
+    expect(canSimulatePublish("scheduled")).toBe(true);
+    expect(canSimulatePublish("published")).toBe(true);
+  });
+});

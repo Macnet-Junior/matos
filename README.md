@@ -2,7 +2,7 @@
 
 **MatOS** is a company operating layer: a precision dark workspace where your agency is modeled as a living map of departments and authored skills.
 
-Phase 4 hardening ships RBAC (Owner / Operator / Author / Viewer), rate limits, SQLite backup/restore, activity JSON export, and a launch checklist — on top of workflows, knowledge, and the Citron Volt UI. **Live Late.dev / Etsy / WhatsApp / Stripe / host deploy remain Phase 4b (deferred).**
+Phase 4b ships Late.dev/Zernio, Etsy OAuth, and WhatsApp Cloud **adapter scaffolding** + Channels Connect UI (encrypted credentials, mocked paths without keys). Phase 4 hardening (RBAC, backups, export) remains. **Stripe / host deploy still deferred.**
 
 ## Design
 
