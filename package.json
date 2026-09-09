@@ -1,0 +1,19 @@
+{
+  "name": "matos",
+  "private": true,
+  "version": "0.1.0",
+  "description": "MatOS — company operating layer (Phase 0)",
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm --filter web build",
+    "lint": "pnpm --filter web lint",
+    "typecheck": "pnpm --filter web typecheck",
+    "test": "pnpm --filter web test",
+    "audit": "pnpm audit --prod"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "packageManager": "pnpm@9.15.9"
+}

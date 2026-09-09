@@ -1,0 +1,35 @@
+@import "@matos/ui/tokens.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--matos-bg);
+  color: var(--matos-text);
+  font-family: var(--matos-font);
+  -webkit-font-smoothing: antialiased;
+}
+
+.react-flow__background {
+  background: transparent !important;
+}
+
+.react-flow__controls-button {
+  background: #161922 !important;
+  border-bottom: 1px solid #2a2e3a !important;
+  fill: #8b93a7 !important;
+}
+
+.react-flow__controls-button:hover {
+  background: #1a1d27 !important;
+}
+
+.react-flow__minimap {
+  background: #12141a !important;
+}

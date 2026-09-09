@@ -1,0 +1,18 @@
+:root {
+  --matos-bg: #0b0c0e;
+  --matos-bg-elev: #12141a;
+  --matos-bg-panel: #161922;
+  --matos-border: #2a2e3a;
+  --matos-border-soft: #1e222d;
+  --matos-text: #f2f3f5;
+  --matos-muted: #8b93a7;
+  --matos-muted2: #5c657a;
+  --matos-citron: #d6f31f;
+  --matos-citron-hover: #e8ff5a;
+  --matos-citron-pressed: #b8d110;
+  --matos-citron-dim: rgba(214, 243, 31, 0.14);
+  --matos-citron-glow: rgba(214, 243, 31, 0.35);
+  --matos-danger: #f07178;
+  --matos-font: "Segoe UI", "Helvetica Neue", ui-sans-serif, system-ui, sans-serif;
+  --matos-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
