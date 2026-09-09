@@ -29,3 +29,8 @@ next-env.d.ts
 
 packages/db/.env
 apps/web/.env.local
+
+# SQLite backups
+backups/
+*.pre-restore-*
+

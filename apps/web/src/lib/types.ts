@@ -71,11 +71,25 @@ export interface ActivityDTO {
   createdAt: string;
 }
 
+export type MatosRole = "Owner" | "Operator" | "Author" | "Viewer";
+
+export interface MapCapabilities {
+  canManageMap: boolean;
+  canEditSkills: boolean;
+  canManageWorkflows: boolean;
+  canRunWorkflows: boolean;
+  canApprove: boolean;
+  canExportActivity: boolean;
+}
+
 export interface MapPayload {
   company: CompanyDTO;
   departments: DepartmentDTO[];
   stats: MapStats;
+  /** @deprecated Prefer role / capabilities — true when role === Owner */
   isOwner: boolean;
+  role: MatosRole;
+  capabilities: MapCapabilities;
 }
 
 export type EncodingCheckId =

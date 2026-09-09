@@ -26,10 +26,10 @@ function tone(
 
 export function RunTrace({
   run: initial,
-  isOwner,
+  canApprove,
 }: {
   run: WorkflowRunDTO;
-  isOwner: boolean;
+  canApprove: boolean;
 }) {
   const router = useRouter();
   const [run, setRun] = useState(initial);
@@ -81,7 +81,7 @@ export function RunTrace({
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone={tone(run.status)}>{run.status}</Badge>
           <Badge tone={tone(run.gateState)}>{run.gateState}</Badge>
-          {isOwner && nextGate ? (
+          {canApprove && nextGate ? (
             <Button variant="primary" disabled={busy} onClick={advance}>
               Advance → {nextGate}
               {nextGate === "published" ? " (simulated)" : ""}

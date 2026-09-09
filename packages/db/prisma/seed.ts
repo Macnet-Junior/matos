@@ -405,6 +405,7 @@ async function main() {
   await prisma.skillKnowledge.deleteMany();
   await prisma.skill.deleteMany();
   await prisma.department.deleteMany();
+  await prisma.userRole.deleteMany();
   await prisma.company.deleteMany();
 
   const company = await prisma.company.create({
@@ -529,17 +530,49 @@ async function main() {
     });
   }
 
+  // Phase 4 RBAC — demo role assignments (OWNER_EMAIL always resolves as Owner)
+  const roleSeeds: { email: string; role: string; note: string }[] = [
+    {
+      email: "macnet@matos.local",
+      role: "Owner",
+      note: "Default owner (also via OWNER_EMAIL)",
+    },
+    {
+      email: "operator@matos.local",
+      role: "Operator",
+      note: "Dev login: run + approve workflows",
+    },
+    {
+      email: "author@matos.local",
+      role: "Author",
+      note: "Dev login: edit skills",
+    },
+    {
+      email: "viewer@matos.local",
+      role: "Viewer",
+      note: "Dev login: read-only",
+    },
+  ];
+  for (const row of roleSeeds) {
+    await prisma.userRole.upsert({
+      where: { email: row.email },
+      create: row,
+      update: { role: row.role, note: row.note },
+    });
+  }
+
   await prisma.activityEvent.create({
     data: {
       action: "seed",
       entityType: "company",
       entityId: company.id,
       summary:
-        "Seeded MatOS Agency with 7 departments, skills, and Phase 3 sample workflows",
+        "Seeded MatOS Agency with 7 departments, skills, workflows, and RBAC roles",
       actorEmail: "system@matos.local",
       payloadJson: JSON.stringify({
-        phase: 3,
+        phase: 4,
         workflows: [researchToCalendar.slug, hookToScript.slug],
+        roles: roleSeeds.map((r) => r.email),
       }),
     },
   });
@@ -550,6 +583,7 @@ async function main() {
     authored: await prisma.skill.count({ where: { status: "authored" } }),
     workflows: await prisma.workflow.count(),
     workflowSteps: await prisma.workflowStep.count(),
+    roles: await prisma.userRole.count(),
   };
   console.log("Seed complete:", counts);
 }

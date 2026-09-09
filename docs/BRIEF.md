@@ -2,7 +2,7 @@
 
 **Product:** MatOS  
 **Owner:** Macnet Junior  
-**Phase:** 3 — workflows, review gates, dry-run engine, channel stubs  
+**Phase:** 4 — hardening (RBAC, security polish, backup, launch checklist) — live integrations **4b deferred**  
 **Accent:** Citron Volt `#D6F31F` (hover `#E8FF5A`, pressed `#B8D110`)
 
 ## Intent
@@ -15,36 +15,42 @@ Next.js shell, Auth.js credentials login, React Flow map chrome, Citron design s
 
 ## Phase 1 (done)
 
-1. **SQLite via Prisma** (`packages/db`) — migrations + seed for 7 departments and commercial-plan skills (`hook-lab`, `short-script`, `content-calendar`, `etsy-listing-lab`, …).
+1. **SQLite via Prisma** (`packages/db`) — migrations + seed for 7 departments and commercial-plan skills.
 2. **Map reads from DB** — server load on `/map` + `GET /api/map`.
-3. **Auto-arrange** — deterministic layout, persists positions (`POST /api/layout`).
-4. **Search** — keyboard-accessible filter in map chrome (⌘K / Ctrl+K).
-5. **Owner-gated CRUD** — create/edit department & skill with Zod; activity events appended.
-6. **Expand/collapse** departments; expanded state persisted for owner.
-7. **Stats row** — dept count, authored / planned / missing from DB.
-8. Tests for validation + DB payload; CI migrates + seeds before checks.
-9. ADR: `docs/adr/001-sqlite-prisma.md`.
+3. **Auto-arrange** — deterministic layout, persists positions.
+4. **Search** — keyboard-accessible filter (⌘K / Ctrl+K).
+5. **Owner-gated CRUD** — evolved into RBAC in Phase 4.
+6. **Expand/collapse** departments; stats row; tests + ADR.
 
 ## Phase 2 (done)
 
-1. **Knowledge corpus** — markdown under `knowledge/` with skill→file links in SQLite.
-2. **Knowledge reader** — `GET /api/knowledge`; Knowledge page + detail Knowledge tab via **react-markdown**.
-3. **Instructions markdown** — skill instructions tab renders markdown the same way.
-4. **Evidence links** — URL + label stored in `evidenceJson`; owner add/remove in Evidence tab.
-5. **Status reconcile** — derived Authored/Planned/Missing synced back to `skills.status`.
-6. **Encoding guide** — live pass/fail checklist for every skill.
-7. Skill authoring form remains the map CRUD modal.
+Knowledge corpus, markdown reader, evidence links, status reconcile, encoding guide.
 
 ## Phase 3 (done)
 
-1. **Workflow model** — `workflows`, `workflow_steps`, `workflow_runs`, `run_steps` via Prisma migration; seed sample chains `research-to-calendar` and `hook-to-script-calendar`.
-2. **Workflows UI** — list + create/edit ordered skill chain; Citron Volt chrome; detail + dry-run.
-3. **Review gates** — content gate `draft → warm → approved → scheduled → published` (published = simulated). Cannot publish without approved.
-4. **Run engine (dry-run)** — execute workflow, step skills, write JSON logs/artifacts, no external posts; run trace UI.
-5. **Integration stubs** — `/settings/channels` lists Late.dev / Etsy / WhatsApp as **Disconnected** with “Connect in Phase 4”. WhatsApp note: Career path + content creation monetization only when live later.
-6. **Home digest** — pending review gates + recent activity + last run summary.
-7. Activity events for workflow create / run / approve.
-8. Tests + CI green.
+Workflows, review gates, dry-run engine, channel stubs, Home digest.
+
+## Phase 4 hardening (done — local, no live OAuth)
+
+1. **RBAC matrix** — roles Owner / Operator / Author / Viewer in `UserRole` + `OWNER_EMAIL`; API enforcement; UI capability flags; permission tests. Dev: `macnet@matos.local` → Owner; `operator@` / `author@` / `viewer@matos.local` seeded.
+2. **Security polish** — in-memory rate limits on sensitive POSTs; CSRF note for Auth.js cookies; `/design` blocked in production; `docs/SECURITY.md` checklist updated.
+3. **Backup & restore** — `scripts/backup-db.sh` + `scripts/restore-db.sh`; `docs/ops/BACKUP.md`; smoke backup under artifacts.
+4. **Performance** — `GET /api/map` skips status reconcile (lean poll), logs timing + `Server-Timing` / `X-Matos-Map-Ms`. Seed map load stays DTO-only JSON (no heavy virtualization needed).
+5. **Launch checklist** — `docs/LAUNCH.md`.
+6. **Activity export** — Owner download JSON from Activity page (`GET /api/activity/export`).
+
+### Map timing note
+
+Profiled approach: SSR `/map` may reconcile skill statuses once; client/API polls use `reconcile: false`. Seeded lean load profiled at ~7ms avg (cold ~24ms) for 7 departments / 33 skills on local SQLite; `GET /api/map` logs `[map] GET /api/map …ms` plus `Server-Timing` / `X-Matos-Map-Ms`.
+
+## Phase 4b (deferred — morning / later)
+
+- Live Late.dev OAuth / posting  
+- Etsy OAuth / marketplace API  
+- WhatsApp Business (Career path + content creation monetization only)  
+- Stripe  
+- Hosted deploy (Vercel or other)  
+- Production auth replacement  
 
 ## Departments (7)
 
@@ -69,19 +75,15 @@ Center node: **MatOS Agency**.
 
 Etsy remains a **stub** — no live marketplace API.
 
-## Phase 4 (not started)
-
-Live Late.dev / Etsy OAuth / WhatsApp (scoped) / Stripe — still deferred. No secrets in repo.
-
 ## Hosting
 
-Host / deploy deferred. Local `pnpm dev` is the delivery surface.
+Host / deploy deferred. Local `pnpm dev` is the delivery surface. See `docs/LAUNCH.md`.
 
-## Non-goals
+## Non-goals (still)
 
 - Live social / Etsy / Stripe / WhatsApp Web automation  
 - Production OAuth providers  
 
 ## Success
 
-Remote `main` runs install → migrate → seed → typecheck → test → `pnpm dev`, Citron aesthetic parity, DB-backed map + knowledge + workflows with dry-run and review gates after owner login (`macnet@matos.local` / `dev`).
+Remote `main` runs install → migrate → seed → typecheck → test → `pnpm dev`, Citron aesthetic parity, DB-backed map + knowledge + workflows + RBAC after owner login (`macnet@matos.local` / `dev`).

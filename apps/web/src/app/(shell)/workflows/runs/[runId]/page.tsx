@@ -9,7 +9,7 @@ type Props = { params: Promise<{ runId: string }> };
 
 export default async function Page({ params }: Props) {
   const { runId } = await params;
-  const { isOwner } = await getSessionFlags();
+  const { canApprove } = await getSessionFlags();
   const run = await getRun(runId);
   if (!run) notFound();
 
@@ -23,7 +23,7 @@ export default async function Page({ params }: Props) {
         </p>
       </div>
       <div className="overflow-auto p-[22px]">
-        <RunTrace run={run} isOwner={isOwner} />
+        <RunTrace run={run} canApprove={canApprove} />
       </div>
     </main>
   );

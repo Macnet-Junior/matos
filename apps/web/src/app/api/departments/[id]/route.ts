@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@matos/db";
-import { requireOwner } from "@/lib/owner";
+import { requireMapManage } from "@/lib/owner";
 import { updateDepartmentSchema } from "@/lib/validation";
 import { appendActivity, loadMapPayload, toDepartmentDTO } from "@/lib/map-data";
 
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function PATCH(req: Request, ctx: Ctx) {
-  const gate = await requireOwner();
+  const gate = await requireMapManage();
   if (!gate.ok) {
     return NextResponse.json({ error: gate.error }, { status: gate.status });
   }

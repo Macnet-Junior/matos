@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@matos/db";
 import { auth } from "@/auth";
-import { requireOwner } from "@/lib/owner";
+import { requireWorkflowManage } from "@/lib/owner";
 import { createWorkflowSchema } from "@/lib/validation";
 import { appendActivity } from "@/lib/map-data";
 import { getWorkflow, listWorkflows, toWorkflowDTO } from "@/lib/workflows";
@@ -18,7 +18,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const gate = await requireOwner();
+  const gate = await requireWorkflowManage();
   if (!gate.ok) {
     return NextResponse.json({ error: gate.error }, { status: gate.status });
   }

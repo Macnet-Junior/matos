@@ -1,9 +1,12 @@
 import { prisma } from "@matos/db";
 import { toActivityDTO } from "@/lib/map-data";
+import { getSessionFlags } from "@/lib/owner";
+import { ActivityExportButton } from "@/components/ActivityExportButton";
 
 export const dynamic = "force-dynamic";
 
 export default async function Page() {
+  const { canExportActivity } = await getSessionFlags();
   const rows = await prisma.activityEvent.findMany({
     orderBy: { createdAt: "desc" },
     take: 100,
@@ -12,11 +15,15 @@ export default async function Page() {
 
   return (
     <main className="flex flex-1 flex-col bg-matos-bg">
-      <div className="border-b border-matos-soft px-[22px] py-4">
-        <h1 className="text-base font-semibold tracking-tight">Activity</h1>
-        <p className="mt-1.5 max-w-xl text-xs text-matos-muted">
-          Append-only trail of map mutations, workflow create/run/approve, and layout changes.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-matos-soft px-[22px] py-4">
+        <div>
+          <h1 className="text-base font-semibold tracking-tight">Activity</h1>
+          <p className="mt-1.5 max-w-xl text-xs text-matos-muted">
+            Append-only trail of map mutations, workflow create/run/approve, and
+            layout changes.
+          </p>
+        </div>
+        <ActivityExportButton enabled={canExportActivity} />
       </div>
       <div className="space-y-2 overflow-auto p-[22px]">
         {events.length === 0 ? (
@@ -45,9 +52,7 @@ export default async function Page() {
                 </time>
               </div>
               {e.actorEmail ? (
-                <p className="mt-2 text-[11px] text-matos-muted">
-                  {e.actorEmail}
-                </p>
+                <p className="mt-2 text-[11px] text-matos-muted">{e.actorEmail}</p>
               ) : null}
             </article>
           ))

@@ -1,26 +1,45 @@
-# MatOS Security Notes (Phase 0)
+# MatOS Security Notes (Phase 4 hardening)
 
 ## Principles
 
 - No backdoors, hidden admin routes, or debug auth bypasses in shipped code.
 - Secrets never in the client bundle or git history.
-- Least privilege; review gates for anything that posts externally or spends money (future phases).
+- Least privilege via RBAC; review gates for anything that posts externally or spends money (Phase 4b).
 
 ## Secrets policy
 
 | Secret | Where | Notes |
 |---|---|---|
 | `AUTH_SECRET` | Server env only | Required by Auth.js. Generate with `openssl rand -base64 32`. Never commit `.env.local`. |
-| Provider keys | Deferred | No OAuth / Etsy / Stripe keys in Phase 0. |
+| Provider keys | Deferred (Phase 4b) | No Late.dev / Etsy / WhatsApp / Stripe keys in repo. |
 
 `.env.example` documents variable names only — placeholder values only.
 
-## Auth (Phase 0)
+## Auth & RBAC
 
-- Credentials provider for **local development**.
-- Dev login: any email + password `dev`, or one-click **Continue as Macnet Junior**.
-- This is intentionally weak and must **not** ship as production auth without replacing the provider and locking down the password path.
+- Credentials provider for **local development** (password `dev`).
+- Dev logins: `macnet@matos.local` → **Owner** (also via `OWNER_EMAIL`); seeded `operator@`, `author@`, `viewer@matos.local`.
+- Roles enforced on mutating APIs: Owner full CRUD; Operator run+approve; Author skill edit; Viewer read-only.
 - Sessions are JWT via Auth.js; `AUTH_SECRET` signs tokens.
+- This credentials path is intentionally weak and must **not** ship as production auth without replacing the provider.
+
+## CSRF (cookie / session note)
+
+Auth.js v5 with the JWT strategy sets an HTTP-only session cookie and uses its built-in CSRF token for the credentials sign-in flow (`/api/auth/csrf` + callback). MatOS mutating APIs rely on that same-site session cookie:
+
+- Keep cookies `SameSite=Lax` (Auth.js default) so cross-site POSTs do not carry the session.
+- Do not disable Auth.js CSRF for the credentials provider.
+- If you later add cookie-based form posts from third-party origins, add explicit CSRF tokens — not needed for current same-origin `fetch` from the App Router UI.
+- Never expose `AUTH_SECRET` to the client.
+
+## Rate limiting
+
+Sensitive POSTs (map/skill/workflow mutations, runs, gate advances, activity export) use a simple **in-memory** per-process rate limiter (`apps/web/src/lib/rate-limit.ts`). Returns HTTP 429 when exceeded. Replace with Redis / edge limits before multi-node production.
+
+## Debug routes
+
+- `/design` design-token preview is **blocked in production** (middleware 404 + page `notFound()`).
+- No debug auth bypass routes ship in the production build.
 
 ## CSP & headers
 
@@ -31,16 +50,22 @@
 - `X-Content-Type-Options: nosniff`
 - `Referrer-Policy: strict-origin-when-cross-origin`
 - `Permissions-Policy` (camera/mic/geolocation off)
+- `X-Powered-By` disabled
 
 ## Checklist before any public deploy
 
+- [x] No debug `/design` route in production builds
+- [x] RBAC enforced on mutating APIs (Owner / Operator / Author / Viewer)
+- [x] Rate-limit sensitive POSTs (in-memory; upgrade for multi-node)
+- [x] CSRF posture documented for Auth.js cookie sessions
+- [x] Review gate model for publish path (dry-run / simulated publish only)
 - [ ] Replace credentials provider with strong auth (or add OAuth + MFA)
 - [ ] Rotate and inject `AUTH_SECRET` via secret manager
 - [ ] Tighten CSP (remove `'unsafe-inline'` / `'unsafe-eval'` if present)
 - [ ] Enable HTTPS only; set secure cookie flags
 - [ ] Dependency audit (`pnpm audit`) clean for criticals
 - [ ] No sample passwords accepted in production builds
-- [ ] Review gate for external publish / spend actions
+- [ ] Live channel / spend actions behind Owner + review gate (Phase 4b)
 
 ## Reporting
 

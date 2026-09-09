@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@matos/db";
-import { requireOwner } from "@/lib/owner";
+import { requireSkillEdit } from "@/lib/owner";
 import { createSkillSchema } from "@/lib/validation";
 import { appendActivity, loadMapPayload, toSkillDTO } from "@/lib/map-data";
 import { deriveSkillStatus } from "@/lib/knowledge";
@@ -8,7 +8,7 @@ import { deriveSkillStatus } from "@/lib/knowledge";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
-  const gate = await requireOwner();
+  const gate = await requireSkillEdit();
   if (!gate.ok) {
     return NextResponse.json({ error: gate.error }, { status: gate.status });
   }

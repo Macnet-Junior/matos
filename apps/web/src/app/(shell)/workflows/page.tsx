@@ -7,7 +7,7 @@ import { WorkflowsPanel } from "@/components/WorkflowsPanel";
 export const dynamic = "force-dynamic";
 
 export default async function Page() {
-  const { isOwner } = await getSessionFlags();
+  const { canManageWorkflows, canRunWorkflows } = await getSessionFlags();
   const workflows = await listWorkflows();
   const skillRows = await prisma.skill.findMany({
     include: { knowledge: true },
@@ -27,7 +27,8 @@ export default async function Page() {
         <WorkflowsPanel
           workflows={workflows}
           skills={skills}
-          isOwner={isOwner}
+          canManageWorkflows={canManageWorkflows}
+          canRunWorkflows={canRunWorkflows}
         />
       </div>
     </main>

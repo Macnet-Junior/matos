@@ -30,12 +30,16 @@ export function WorkflowDetail({
   workflow: initial,
   runs: initialRuns,
   skills,
-  isOwner,
+  canManageWorkflows,
+  canRunWorkflows,
+  canApprove,
 }: {
   workflow: WorkflowDTO;
   runs: WorkflowRunSummaryDTO[];
   skills: SkillDTO[];
-  isOwner: boolean;
+  canManageWorkflows: boolean;
+  canRunWorkflows: boolean;
+  canApprove: boolean;
 }) {
   const router = useRouter();
   const [workflow, setWorkflow] = useState(initial);
@@ -160,25 +164,25 @@ export function WorkflowDetail({
           <Badge tone={gateTone(workflow.gateState)}>
             {workflow.gateState}
           </Badge>
-          {isOwner ? (
-            <>
-              <Button variant="secondary" onClick={() => setEditing((v) => !v)}>
-                {editing ? "Close editor" : "Edit chain"}
-              </Button>
-              <Button variant="primary" disabled={busy} onClick={dryRun}>
-                Dry-run
-              </Button>
-              {nextGate ? (
-                <Button
-                  variant="secondary"
-                  disabled={busy}
-                  onClick={advanceGate}
-                >
-                  Advance → {nextGate}
-                  {nextGate === "published" ? " (sim)" : ""}
-                </Button>
-              ) : null}
-            </>
+          {canManageWorkflows ? (
+            <Button variant="secondary" onClick={() => setEditing((v) => !v)}>
+              {editing ? "Close editor" : "Edit chain"}
+            </Button>
+          ) : null}
+          {canRunWorkflows ? (
+            <Button variant="primary" disabled={busy} onClick={dryRun}>
+              Dry-run
+            </Button>
+          ) : null}
+          {canApprove && nextGate ? (
+            <Button
+              variant="secondary"
+              disabled={busy}
+              onClick={advanceGate}
+            >
+              Advance → {nextGate}
+              {nextGate === "published" ? " (sim)" : ""}
+            </Button>
           ) : null}
         </div>
       </div>

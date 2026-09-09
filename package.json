@@ -1,7 +1,7 @@
 {
   "name": "matos",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "MatOS — company operating layer",
   "scripts": {
     "dev": "pnpm --filter web dev",

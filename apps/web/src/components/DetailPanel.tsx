@@ -5,6 +5,7 @@ import { Badge, Button } from "@matos/ui";
 import type {
   DepartmentDTO,
   EvidenceLinkDTO,
+  MapCapabilities,
   MapPayload,
   SkillDTO,
   SkillStatus,
@@ -113,11 +114,11 @@ function KnowledgeTab({
 
 function EvidenceTab({
   skill,
-  isOwner,
+  capabilities,
   onMapUpdate,
 }: {
   skill: SkillDTO;
-  isOwner: boolean;
+  capabilities: MapCapabilities;
   onMapUpdate?: (map: MapPayload, skill: SkillDTO) => void;
 }) {
   const [label, setLabel] = useState("");
@@ -195,7 +196,7 @@ function EvidenceTab({
                 {item.url}
               </a>
             </div>
-            {isOwner && (
+            {capabilities.canEditSkills && (
               <button
                 type="button"
                 disabled={busy}
@@ -209,7 +210,7 @@ function EvidenceTab({
         ))
       )}
 
-      {isOwner && (
+      {capabilities.canEditSkills && (
         <form
           onSubmit={addLink}
           className="mt-1 grid gap-2 rounded-lg border border-matos-soft bg-matos-bg p-2.5"
@@ -249,14 +250,14 @@ function EvidenceTab({
 export function DetailPanel({
   selection,
   departments,
-  isOwner,
+  capabilities,
   onEditSkill,
   onEditDepartment,
   onMapUpdate,
 }: {
   selection: Selection;
   departments: DepartmentDTO[];
-  isOwner: boolean;
+  capabilities: MapCapabilities;
   onEditSkill?: (skill: SkillDTO) => void;
   onEditDepartment?: (department: DepartmentDTO) => void;
   onMapUpdate?: (map: MapPayload, skill: SkillDTO) => void;
@@ -333,7 +334,7 @@ export function DetailPanel({
         <p className="text-xs text-matos-muted">
           Click the node again to expand or collapse skill nodes on the map.
         </p>
-        {isOwner && onEditDepartment && (
+        {capabilities.canManageMap && onEditDepartment && (
           <Button
             variant="secondary"
             className="mt-auto w-full"
@@ -433,7 +434,7 @@ export function DetailPanel({
         {tab === "evidence" && (
           <EvidenceTab
             skill={skill}
-            isOwner={isOwner}
+            capabilities={capabilities}
             onMapUpdate={onMapUpdate}
           />
         )}
@@ -446,7 +447,7 @@ export function DetailPanel({
       )}
 
       <div className="mt-auto flex flex-col gap-2">
-        {isOwner && onEditSkill && (
+        {capabilities.canEditSkills && onEditSkill && (
           <Button
             variant="secondary"
             className="w-full"

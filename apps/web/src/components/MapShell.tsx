@@ -101,7 +101,7 @@ export function MapShell({ initial }: { initial: MapPayload }) {
         ),
       }));
 
-      if (!map.isOwner) return;
+      if (!map.capabilities.canManageMap) return;
 
       try {
         const res = await fetch(`/api/departments/${departmentId}`, {
@@ -116,11 +116,11 @@ export function MapShell({ initial }: { initial: MapPayload }) {
         flash(err instanceof Error ? err.message : "Expand failed");
       }
     },
-    [map.departments, map.isOwner, applyMap, flash],
+    [map.departments, map.capabilities.canManageMap, applyMap, flash],
   );
 
   const onAutoArrange = useCallback(async () => {
-    if (!map.isOwner) {
+    if (!map.capabilities.canManageMap) {
       flash("Owner only");
       return;
     }
@@ -140,7 +140,7 @@ export function MapShell({ initial }: { initial: MapPayload }) {
     } finally {
       setBusy(false);
     }
-  }, [map.isOwner, applyMap, flash]);
+  }, [map.capabilities.canManageMap, applyMap, flash]);
 
   const createSkill = useCallback(
     async (values: SkillFormValues) => {
@@ -274,7 +274,7 @@ export function MapShell({ initial }: { initial: MapPayload }) {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            {map.isOwner && (
+            {map.capabilities.canManageMap && (
               <Button
                 variant="ghost"
                 onClick={() => setDeptModal({ mode: "create" })}
@@ -285,16 +285,16 @@ export function MapShell({ initial }: { initial: MapPayload }) {
             <Button
               variant="secondary"
               onClick={onAutoArrange}
-              disabled={busy || !map.isOwner}
-              title={map.isOwner ? "Deterministic layout + persist" : "Owner only"}
+              disabled={busy || !map.capabilities.canManageMap}
+              title={map.capabilities.canManageMap ? "Deterministic layout + persist" : "Owner only"}
             >
               Auto arrange
             </Button>
             <Button
               variant="primary"
               onClick={() => setSkillModal({ mode: "create" })}
-              disabled={!map.isOwner}
-              title={map.isOwner ? "Create skill" : "Owner only"}
+              disabled={!map.capabilities.canEditSkills}
+              title={map.capabilities.canEditSkills ? "Create skill" : "Authors & owners only"}
             >
               New skill
             </Button>
@@ -340,7 +340,7 @@ export function MapShell({ initial }: { initial: MapPayload }) {
       <DetailPanel
         selection={selection}
         departments={map.departments}
-        isOwner={map.isOwner}
+        capabilities={map.capabilities}
         onEditSkill={(skill) => setSkillModal({ mode: "edit", skill })}
         onEditDepartment={(department) =>
           setDeptModal({ mode: "edit", department })

@@ -18,15 +18,12 @@ import type {
 } from "./types";
 import { computeStats } from "./map-layout";
 import { reconcileSkillStatuses, withDerivedStatuses } from "./knowledge";
+import { capabilitiesFor, resolveRole } from "./rbac";
 
 export { computeStats, computeAutoArrange } from "./map-layout";
 
 type SkillRow = Skill & { knowledge: SkillKnowledge[] };
 type DeptRow = Department & { skills: SkillRow[] };
-
-function ownerEmail(): string {
-  return (process.env.OWNER_EMAIL ?? "macnet@matos.local").trim().toLowerCase();
-}
 
 function asStatus(value: string): SkillStatus {
   if (value === "authored" || value === "planned" || value === "missing") {
@@ -130,12 +127,16 @@ export async function loadMapPayload(
     })),
   );
   const email = viewerEmail?.trim().toLowerCase() ?? null;
+  const role = await resolveRole(email);
+  const capabilities = capabilitiesFor(role);
 
   return {
     company: companyDTO,
     departments,
     stats: computeStats(departments),
-    isOwner: !!email && email === ownerEmail(),
+    isOwner: role === "Owner",
+    role,
+    capabilities,
   };
 }
 

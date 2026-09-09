@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@matos/db";
 import { auth } from "@/auth";
-import { requireOwner } from "@/lib/owner";
+import { requireWorkflowManage } from "@/lib/owner";
 import { updateWorkflowSchema } from "@/lib/validation";
 import { appendActivity } from "@/lib/map-data";
 import {
@@ -44,7 +44,7 @@ export async function GET(_req: Request, ctx: Ctx) {
 }
 
 export async function PATCH(req: Request, ctx: Ctx) {
-  const gate = await requireOwner();
+  const gate = await requireWorkflowManage();
   if (!gate.ok) {
     return NextResponse.json({ error: gate.error }, { status: gate.status });
   }
@@ -120,7 +120,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
 }
 
 export async function DELETE(_req: Request, ctx: Ctx) {
-  const gate = await requireOwner();
+  const gate = await requireWorkflowManage();
   if (!gate.ok) {
     return NextResponse.json({ error: gate.error }, { status: gate.status });
   }

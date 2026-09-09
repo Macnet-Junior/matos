@@ -2,7 +2,7 @@
 
 **MatOS** is a company operating layer: a precision dark workspace where your agency is modeled as a living map of departments and authored skills.
 
-Phase 3 ships workflows (ordered skill chains), review gates, dry-run execution with JSON artifacts, Home digest, and Disconnected channel stubs — on top of the SQLite map, knowledge, and Citron Volt UI.
+Phase 4 hardening ships RBAC (Owner / Operator / Author / Viewer), rate limits, SQLite backup/restore, activity JSON export, and a launch checklist — on top of workflows, knowledge, and the Citron Volt UI. **Live Late.dev / Etsy / WhatsApp / Stripe / host deploy remain Phase 4b (deferred).**
 
 ## Design
 
@@ -23,8 +23,9 @@ Aesthetic: Linear / Raycast–class precision dark UI. No purple gradients.
 apps/web          Next.js App Router + Auth.js + map UI + APIs
 packages/db       Prisma schema, migrations, seed (SQLite)
 packages/ui       Citron tokens, Button, Panel, Badge
-docs/             BRIEF, SECURITY, ADRs
+docs/             BRIEF, SECURITY, LAUNCH, ADRs, ops/
 knowledge/        Canonical markdown stubs
+scripts/          backup-db.sh, restore-db.sh
 ```
 
 ## Prerequisites
@@ -44,6 +45,7 @@ cp .env.example apps/web/.env.local
 # Set AUTH_SECRET (openssl rand -base64 32)
 # Set DATABASE_URL to an absolute sqlite path, e.g.
 # DATABASE_URL="file:/ABS/PATH/matos/packages/db/prisma/dev.db"
+# Set OWNER_EMAIL=macnet@matos.local
 
 pnpm db:migrate
 pnpm db:seed
@@ -51,7 +53,31 @@ pnpm db:seed
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Sign in as **macnet@matos.local** + password `dev` (owner), or any email + `dev` (viewer). One-click **Continue as Macnet Junior** works too.
+Open [http://localhost:3000](http://localhost:3000).
+
+### Dev logins (password `dev`)
+
+| Email | Role |
+|---|---|
+| `macnet@matos.local` | **Owner** (also forced by `OWNER_EMAIL`) |
+| `operator@matos.local` | Operator — run + approve |
+| `author@matos.local` | Author — edit skills |
+| `viewer@matos.local` | Viewer — read-only |
+| any other email | Viewer (default) |
+
+One-click **Continue as Macnet Junior** works too.
+
+### Assigning roles
+
+Roles live in the `UserRole` SQLite table (`email` unique → `Owner` \| `Operator` \| `Author` \| `Viewer`).
+
+```bash
+# Example: promote an author (Prisma Studio or SQL)
+pnpm --filter @matos/db studio
+# Or re-seed defaults: pnpm db:seed
+```
+
+`OWNER_EMAIL` always resolves as Owner even if the DB row differs. See `docs/LAUNCH.md` and `apps/web/src/lib/rbac.ts`.
 
 ## Scripts
 
@@ -63,24 +89,25 @@ Open [http://localhost:3000](http://localhost:3000). Sign in as **macnet@matos.l
 | `pnpm test` | Vitest |
 | `pnpm build` | Production build |
 | `pnpm db:migrate` | Apply Prisma migrations |
-| `pnpm db:seed` | Seed 7 departments + skills |
+| `pnpm db:seed` | Seed departments, skills, workflows, roles |
 | `pnpm audit` | Dependency audit (prod) |
+| `./scripts/backup-db.sh` | SQLite backup |
+| `./scripts/restore-db.sh <file>` | SQLite restore |
 
-## Auth
+## Auth & security
 
-Credentials provider only. Mutations require `OWNER_EMAIL` (default `macnet@matos.local`). No OAuth. See `docs/SECURITY.md`.
+Credentials provider only (dev). Mutations gated by RBAC. See `docs/SECURITY.md`, `docs/LAUNCH.md`, `docs/ops/BACKUP.md`.
 
-## Phase 3 surfaces
+## Phase 4 surfaces
 
 | Route | Purpose |
 |---|---|
-| `/workflows` | List / create skill chains |
-| `/workflows/[id]` | Edit chain, advance gate, dry-run |
-| `/workflows/runs/[runId]` | Run trace (logs + artifacts) |
-| `/home` | Pending gates + activity + last run |
+| `/activity` | Trail + Owner **Download JSON** |
+| `/workflows` | Chains; Operator can dry-run |
 | `/settings/channels` | Late.dev / Etsy / WhatsApp stubs |
+| `docs/LAUNCH.md` | Env + deferred host/connect steps |
 
-## Out of scope
+## Out of scope (Phase 4b)
 
 Live Etsy / Late.dev / WhatsApp Web / Stripe OAuth, deploy host.
 

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@matos/db";
-import { requireOwner } from "@/lib/owner";
+import { requireMapManage } from "@/lib/owner";
 import { autoArrangeSchema, layoutSchema } from "@/lib/validation";
 import { appendActivity, loadMapPayload } from "@/lib/map-data";
 import { computeAutoArrange } from "@/lib/map-layout";
@@ -8,7 +8,7 @@ import { computeAutoArrange } from "@/lib/map-layout";
 export const dynamic = "force-dynamic";
 
 export async function PUT(req: Request) {
-  const gate = await requireOwner();
+  const gate = await requireMapManage();
   if (!gate.ok) {
     return NextResponse.json({ error: gate.error }, { status: gate.status });
   }
@@ -63,7 +63,7 @@ export async function PUT(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const gate = await requireOwner();
+  const gate = await requireMapManage();
   if (!gate.ok) {
     return NextResponse.json({ error: gate.error }, { status: gate.status });
   }

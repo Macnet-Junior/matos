@@ -9,6 +9,12 @@ export async function middleware(req: NextRequest) {
     secret: process.env.AUTH_SECRET,
   });
   const isLoggedIn = !!token;
+  const isProd = process.env.NODE_ENV === "production";
+
+  // Design system preview is a local/dev surface — not shipped publicly.
+  if (isProd && (pathname === "/design" || pathname.startsWith("/design/"))) {
+    return new NextResponse("Not found", { status: 404 });
+  }
 
   const publicPaths = ["/login", "/design"];
   const isPublic =

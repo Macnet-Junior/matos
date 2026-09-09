@@ -25,6 +25,7 @@ export type {
   WorkflowStep,
   WorkflowRun,
   RunStep,
+  UserRole,
 } from "@prisma/client";
 
 export function parseJsonArray(raw: string): string[] {

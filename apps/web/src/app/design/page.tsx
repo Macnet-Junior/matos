@@ -1,3 +1,4 @@
+import { notFound } from "next/navigation";
 import { Badge, Button, Panel } from "@matos/ui";
 
 const swatches = [
@@ -11,7 +12,12 @@ const swatches = [
   { name: "pressed", hex: "#B8D110", className: "bg-matos-citron-pressed" },
 ];
 
-export default function DesignPage() {
+export default async function DesignPageGuarded() {
+  if (process.env.NODE_ENV === "production") notFound();
+  return DesignPageInner();
+}
+
+function DesignPageInner() {
   return (
     <main className="mx-auto max-w-3xl space-y-8 px-6 py-10">
       <header>

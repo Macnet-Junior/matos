@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireOwner } from "@/lib/owner";
+import { requireWorkflowRun } from "@/lib/owner";
 import { appendActivity } from "@/lib/map-data";
 import { executeDryRun } from "@/lib/workflows";
 
@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(_req: Request, ctx: Ctx) {
-  const gate = await requireOwner();
+  const gate = await requireWorkflowRun();
   if (!gate.ok) {
     return NextResponse.json({ error: gate.error }, { status: gate.status });
   }

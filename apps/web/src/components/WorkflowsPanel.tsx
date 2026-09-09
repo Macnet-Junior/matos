@@ -25,11 +25,13 @@ function slugify(name: string): string {
 export function WorkflowsPanel({
   workflows: initial,
   skills,
-  isOwner,
+  canManageWorkflows,
+  canRunWorkflows,
 }: {
   workflows: WorkflowDTO[];
   skills: SkillDTO[];
-  isOwner: boolean;
+  canManageWorkflows: boolean;
+  canRunWorkflows: boolean;
 }) {
   const router = useRouter();
   const [workflows, setWorkflows] = useState(initial);
@@ -131,7 +133,7 @@ export function WorkflowsPanel({
           Ordered skill chains with review gates. Dry-run only — no external
           posts.
         </p>
-        {isOwner ? (
+        {canManageWorkflows ? (
           <Button variant="primary" onClick={() => setOpen(true)}>
             New workflow
           </Button>
@@ -197,7 +199,7 @@ export function WorkflowsPanel({
                 >
                   Open
                 </Link>
-                {isOwner ? (
+                {canRunWorkflows ? (
                   <Button
                     variant="primary"
                     disabled={runningId === wf.id}

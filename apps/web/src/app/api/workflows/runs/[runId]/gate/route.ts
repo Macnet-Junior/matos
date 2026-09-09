@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireOwner } from "@/lib/owner";
+import { requireWorkflowApprove } from "@/lib/owner";
 import { advanceGateSchema } from "@/lib/validation";
 import { appendActivity } from "@/lib/map-data";
 import { advanceRunGate } from "@/lib/workflows";
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 type Ctx = { params: Promise<{ runId: string }> };
 
 export async function POST(req: Request, ctx: Ctx) {
-  const gate = await requireOwner();
+  const gate = await requireWorkflowApprove();
   if (!gate.ok) {
     return NextResponse.json({ error: gate.error }, { status: gate.status });
   }
