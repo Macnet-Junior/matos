@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import {
   Background,
   Controls,
@@ -14,13 +14,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { Badge } from "@matos/ui";
-import {
-  company,
-  departments,
-  skillsForDepartment,
-  type Department,
-  type Skill,
-} from "@/data/company-map";
+import type { DepartmentDTO, MapPayload, SkillDTO, SkillStatus } from "@/lib/types";
 import type { Selection } from "./DetailPanel";
 
 type MapNodeData = {
@@ -29,16 +23,33 @@ type MapNodeData = {
   kind: "company" | "department" | "skill";
   selected?: boolean;
   expanded?: boolean;
-  status?: string;
-  department?: Department;
-  skill?: Skill;
+  status?: SkillStatus;
+  department?: DepartmentDTO;
+  skill?: SkillDTO;
+  dimmed?: boolean;
 };
 
 type MapNode = Node<MapNodeData>;
 
+function statusTone(status?: SkillStatus): "citron" | "muted" | "danger" {
+  if (status === "authored") return "citron";
+  if (status === "missing") return "danger";
+  return "muted";
+}
+
+function statusLabel(status?: SkillStatus): string {
+  if (status === "authored") return "Authored";
+  if (status === "missing") return "Missing";
+  return "Planned";
+}
+
 function CompanyNode({ data }: NodeProps<MapNode>) {
   return (
-    <div className="min-w-[200px] rounded-xl border border-[#3a4050] bg-matos-panel px-3.5 py-3 text-center shadow-[0_8px_24px_rgba(0,0,0,0.35)]">
+    <div
+      className={`min-w-[200px] rounded-xl border bg-matos-panel px-3.5 py-3 text-center shadow-[0_8px_24px_rgba(0,0,0,0.35)] ${
+        data.selected ? "border-matos-citron shadow-citron" : "border-[#3a4050]"
+      } ${data.dimmed ? "opacity-35" : ""}`}
+    >
       <Handle type="source" position={Position.Top} className="!bg-matos-citron !border-0" />
       <Handle type="source" position={Position.Right} className="!bg-matos-citron !border-0" />
       <Handle type="source" position={Position.Bottom} className="!bg-matos-citron !border-0" />
@@ -53,14 +64,11 @@ function CompanyNode({ data }: NodeProps<MapNode>) {
 }
 
 function DeptNode({ data }: NodeProps<MapNode>) {
-  const selected = data.selected;
   return (
     <div
       className={`min-w-[170px] rounded-xl border bg-matos-panel px-3.5 py-3 shadow-[0_8px_24px_rgba(0,0,0,0.35)] ${
-        selected
-          ? "border-matos-citron shadow-citron"
-          : "border-matos-border"
-      }`}
+        data.selected ? "border-matos-citron shadow-citron" : "border-matos-border"
+      } ${data.dimmed ? "opacity-35" : ""}`}
     >
       <Handle type="target" position={Position.Left} className="!bg-[#3a4050] !border-0" />
       <Handle type="source" position={Position.Right} className="!bg-matos-citron !border-0" />
@@ -73,7 +81,7 @@ function DeptNode({ data }: NodeProps<MapNode>) {
             : "bg-[#1c2030] text-matos-muted"
         }`}
       >
-        {data.selected ? "Selected" : data.expanded ? "Hide skills" : "Show skills"}
+        {data.expanded ? "Hide skills" : "Show skills"}
       </span>
     </div>
   );
@@ -84,14 +92,14 @@ function SkillNode({ data }: NodeProps<MapNode>) {
     <div
       className={`min-w-[148px] rounded-xl border bg-matos-panel px-3.5 py-3 shadow-[0_8px_24px_rgba(0,0,0,0.35)] ${
         data.selected ? "border-matos-citron shadow-citron" : "border-[#33384a]"
-      }`}
+      } ${data.dimmed ? "opacity-35" : ""}`}
     >
       <Handle type="target" position={Position.Left} className="!bg-[#3a4050] !border-0" />
       <h3 className="font-mono text-[12px] font-semibold tracking-tight">
         {data.label}
       </h3>
       <div className="mt-2">
-        <Badge>Authored</Badge>
+        <Badge tone={statusTone(data.status)}>{statusLabel(data.status)}</Badge>
       </div>
     </div>
   );
@@ -103,26 +111,30 @@ const nodeTypes = {
   skill: SkillNode,
 };
 
-const DEPT_POSITIONS: Record<string, { x: number; y: number }> = {
-  "dept-research": { x: 40, y: 40 },
-  "dept-script": { x: 40, y: 220 },
-  "dept-content": { x: 520, y: 20 },
-  "dept-calendar": { x: 40, y: 400 },
-  "dept-publish": { x: 520, y: 420 },
-  "dept-monetization": { x: 520, y: 220 },
-  "dept-proof": { x: 280, y: 480 },
-};
+function matchesQuery(
+  query: string,
+  ...parts: Array<string | undefined | null>
+): boolean {
+  if (!query) return true;
+  const q = query.toLowerCase();
+  return parts.some((p) => (p ?? "").toLowerCase().includes(q));
+}
 
 export function CompanyMap({
-  onSelect,
+  map,
   selection,
+  search,
+  onSelect,
+  onToggleExpand,
 }: {
-  onSelect: (s: Selection) => void;
+  map: MapPayload;
   selection: Selection;
+  search: string;
+  onSelect: (s: Selection) => void;
+  onToggleExpand: (departmentId: string) => void;
 }) {
-  const [expanded, setExpanded] = useState<Set<string>>(
-    () => new Set(["dept-content", "dept-monetization"]),
-  );
+  const { company, departments } = map;
+  const q = search.trim();
 
   const selectedId =
     selection?.kind === "skill"
@@ -138,43 +150,56 @@ export function CompanyMap({
       {
         id: company.id,
         type: "company",
-        position: { x: 280, y: 220 },
+        position: { x: company.posX, y: company.posY },
         data: {
           label: company.name,
           subtitle: company.summary,
           kind: "company",
           selected: selectedId === company.id,
+          dimmed: q.length > 0,
         },
-        draggable: true,
+        draggable: false,
       },
     ];
 
     const es: Edge[] = [];
 
     for (const dept of departments) {
-      const pos = DEPT_POSITIONS[dept.id] ?? { x: 0, y: 0 };
-      const isExpanded = expanded.has(dept.id);
-      const skillList = skillsForDepartment(dept.id);
+      const deptMatch = matchesQuery(q, dept.name, dept.summary, dept.slug);
+      const matchingSkills = dept.skills.filter((s) =>
+        matchesQuery(q, s.slug, s.title, s.description, s.status),
+      );
+      const showSkills =
+        dept.expanded || (q.length > 0 && matchingSkills.length > 0);
+      const skillList = q.length > 0 ? matchingSkills : dept.skills;
+      const dimDept = q.length > 0 && !deptMatch && matchingSkills.length === 0;
+
       ns.push({
         id: dept.id,
         type: "department",
-        position: pos,
+        position: { x: dept.posX, y: dept.posY },
         data: {
           label: dept.name,
-          subtitle: `${skillList.length || dept.skillIds.length} skills${
-            isExpanded && skillList.length ? " · expanded" : ""
+          subtitle: `${dept.skills.length} skills${
+            showSkills && skillList.length ? " · expanded" : ""
           }`,
           kind: "department",
           selected: selectedId === dept.id,
-          expanded: isExpanded,
+          expanded: showSkills,
           department: dept,
+          dimmed: dimDept,
         },
+        draggable: false,
       });
+
       es.push({
         id: `e-${company.id}-${dept.id}`,
         source: company.id,
         target: dept.id,
-        style: { stroke: "#3a4050" },
+        style: {
+          stroke: "#3a4050",
+          opacity: dimDept ? 0.25 : 1,
+        },
         markerEnd: {
           type: MarkerType.ArrowClosed,
           color: "#3a4050",
@@ -183,22 +208,28 @@ export function CompanyMap({
         },
       });
 
-      if (isExpanded) {
+      if (showSkills) {
         skillList.forEach((skill, index) => {
+          const pos =
+            skill.posX != null && skill.posY != null
+              ? { x: skill.posX, y: skill.posY }
+              : {
+                  x: dept.posX + 240,
+                  y: dept.posY + index * 90 - 10,
+                };
           ns.push({
             id: skill.id,
             type: "skill",
-            position: {
-              x: pos.x + 240,
-              y: pos.y + index * 90 - 10,
-            },
+            position: pos,
             data: {
               label: skill.slug,
               kind: "skill",
               selected: selectedId === skill.id,
               status: skill.status,
               skill,
+              dimmed: q.length > 0 && !matchesQuery(q, skill.slug, skill.title),
             },
+            draggable: false,
           });
           es.push({
             id: `e-${dept.id}-${skill.id}`,
@@ -217,7 +248,7 @@ export function CompanyMap({
     }
 
     return { nodes: ns, edges: es };
-  }, [expanded, selectedId]);
+  }, [company, departments, selectedId, q]);
 
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: MapNode) => {
@@ -226,13 +257,7 @@ export function CompanyMap({
         return;
       }
       if (node.data.kind === "department" && node.data.department) {
-        const id = node.data.department.id;
-        setExpanded((prev) => {
-          const next = new Set(prev);
-          if (next.has(id)) next.delete(id);
-          else next.add(id);
-          return next;
-        });
+        onToggleExpand(node.data.department.id);
         onSelect({ kind: "department", department: node.data.department });
         return;
       }
@@ -240,14 +265,11 @@ export function CompanyMap({
         onSelect({ kind: "skill", skill: node.data.skill });
       }
     },
-    [onSelect],
+    [onSelect, onToggleExpand],
   );
 
   return (
     <div className="relative h-full w-full">
-      <div className="pointer-events-none absolute left-7 top-[18px] z-10 w-[260px] rounded-[9px] border border-matos-border bg-matos-panel px-3 py-2.5 text-xs text-matos-muted">
-        Search skills, departments…
-      </div>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -255,10 +277,13 @@ export function CompanyMap({
         onNodeClick={onNodeClick}
         fitView
         fitViewOptions={{ padding: 0.2 }}
-        minZoom={0.4}
+        minZoom={0.35}
         maxZoom={1.6}
         proOptions={{ hideAttribution: true }}
         colorMode="dark"
+        nodesDraggable={false}
+        nodesConnectable={false}
+        elementsSelectable
       >
         <Background color="#2a2e3a" gap={22} size={1} />
         <Controls showInteractive={false} position="bottom-left" />

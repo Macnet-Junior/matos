@@ -20,3 +20,12 @@ coverage
 *.tsbuildinfo
 next-env.d.ts
 .turbo
+
+# SQLite
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+packages/db/.env
+apps/web/.env.local

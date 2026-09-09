@@ -13,9 +13,14 @@ const workspace = [
 
 const build = [
   { href: "/workflows", label: "Workflows" },
-  { href: "/skills", label: "Skills · 2" },
+  { href: "/skills", label: "Skills" },
   { href: "/knowledge", label: "Knowledge" },
   { href: "/activity", label: "Activity" },
+];
+
+const library = [
+  { href: "/library", label: "Library" },
+  { href: "/library/encoding-guide", label: "Encoding guide" },
 ];
 
 function NavLink({ href, label }: { href: string; label: string }) {
@@ -74,6 +79,17 @@ export function Sidebar() {
         </div>
         <nav className="flex flex-col gap-0.5">
           {build.map((item) => (
+            <NavLink key={item.href} {...item} />
+          ))}
+        </nav>
+      </div>
+
+      <div>
+        <div className="px-2 pb-1.5 text-[10px] uppercase tracking-[0.08em] text-matos-muted2">
+          Library
+        </div>
+        <nav className="flex flex-col gap-0.5">
+          {library.map((item) => (
             <NavLink key={item.href} {...item} />
           ))}
         </nav>

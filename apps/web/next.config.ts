@@ -25,7 +25,8 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@matos/ui"],
+  transpilePackages: ["@matos/ui", "@matos/db"],
+  serverExternalPackages: ["@prisma/client", "prisma"],
   poweredByHeader: false,
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];

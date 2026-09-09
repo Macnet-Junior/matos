@@ -9,6 +9,9 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      AUTH_SECRET: ci-test-secret-not-for-production-use-32b
+      OWNER_EMAIL: macnet@matos.local
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -18,9 +21,19 @@ jobs:
           cache: pnpm
       - name: Install
         run: pnpm install --frozen-lockfile
+      - name: Migrate + seed
+        working-directory: packages/db
+        env:
+          DATABASE_URL: file:./ci.db
+        run: |
+          echo 'DATABASE_URL="file:./ci.db"' > .env
+          pnpm exec prisma migrate deploy
+          pnpm seed
       - name: Lint
         run: pnpm lint
       - name: Typecheck
         run: pnpm typecheck
       - name: Test
+        env:
+          DATABASE_URL: file:${{ github.workspace }}/packages/db/prisma/ci.db
         run: pnpm test

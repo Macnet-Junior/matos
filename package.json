@@ -1,15 +1,22 @@
 {
   "name": "matos",
   "private": true,
-  "version": "0.1.0",
-  "description": "MatOS — company operating layer (Phase 0)",
+  "version": "0.2.0",
+  "description": "MatOS — company operating layer",
   "scripts": {
     "dev": "pnpm --filter web dev",
-    "build": "pnpm --filter web build",
+    "build": "pnpm db:generate && pnpm --filter web build",
     "lint": "pnpm --filter web lint",
     "typecheck": "pnpm --filter web typecheck",
     "test": "pnpm --filter web test",
-    "audit": "pnpm audit --prod"
+    "audit": "pnpm audit --prod",
+    "db:generate": "pnpm --filter @matos/db generate",
+    "db:migrate": "pnpm --filter @matos/db migrate",
+    "db:migrate:dev": "pnpm --filter @matos/db migrate:dev",
+    "db:seed": "pnpm --filter @matos/db seed",
+    "db:push": "pnpm --filter @matos/db push",
+    "db:reset": "pnpm --filter @matos/db reset",
+    "postinstall": "pnpm db:generate"
   },
   "engines": {
     "node": ">=20",

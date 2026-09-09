@@ -2,7 +2,7 @@
 
 **MatOS** is a company operating layer: a precision dark workspace where your agency is modeled as a living map of departments and authored skills.
 
-Phase 0 ships a runnable monorepo with Citron Volt UI, credentials auth (dev login), and an interactive company map.
+Phase 1 ships a SQLite-backed company map (Prisma), owner-gated CRUD, search, auto-arrange, activity log, and Citron Volt UI.
 
 ## Design
 
@@ -20,7 +20,8 @@ Aesthetic: Linear / Raycast–class precision dark UI. No purple gradients.
 ## Structure
 
 ```
-apps/web          Next.js App Router + Auth.js + company map
+apps/web          Next.js App Router + Auth.js + map UI + APIs
+packages/db       Prisma schema, migrations, seed (SQLite)
 packages/ui       Citron tokens, Button, Panel, Badge
 docs/             BRIEF, SECURITY, ADRs
 knowledge/        Canonical markdown stubs
@@ -40,12 +41,17 @@ cd matos
 pnpm install
 
 cp .env.example apps/web/.env.local
-# Ensure AUTH_SECRET is set (openssl rand -base64 32)
+# Set AUTH_SECRET (openssl rand -base64 32)
+# Set DATABASE_URL to an absolute sqlite path, e.g.
+# DATABASE_URL="file:/ABS/PATH/matos/packages/db/prisma/dev.db"
+
+pnpm db:migrate
+pnpm db:seed
 
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Sign in with any email + password `dev`, or click **Continue as Macnet Junior**.
+Open [http://localhost:3000](http://localhost:3000). Sign in as **macnet@matos.local** + password `dev` (owner), or any email + `dev` (viewer). One-click **Continue as Macnet Junior** works too.
 
 ## Scripts
 
@@ -54,19 +60,19 @@ Open [http://localhost:3000](http://localhost:3000). Sign in with any email + pa
 | `pnpm dev` | Start Next.js on :3000 |
 | `pnpm lint` | ESLint |
 | `pnpm typecheck` | TypeScript strict |
-| `pnpm test` | Vitest smoke tests |
+| `pnpm test` | Vitest |
 | `pnpm build` | Production build |
+| `pnpm db:migrate` | Apply Prisma migrations |
+| `pnpm db:seed` | Seed 7 departments + skills |
 | `pnpm audit` | Dependency audit (prod) |
 
-Filter a package: `pnpm --filter web typecheck`
+## Auth
 
-## Auth (Phase 0)
+Credentials provider only. Mutations require `OWNER_EMAIL` (default `macnet@matos.local`). No OAuth. See `docs/SECURITY.md`.
 
-Credentials provider only. No OAuth. Set `AUTH_SECRET` in `apps/web/.env.local`. See `.env.example` and `docs/SECURITY.md`.
+## Out of scope
 
-## Out of scope (Phase 0)
-
-Live Etsy / social APIs, Stripe, deploy, workflow engine.
+Live Etsy / social APIs, Stripe, deploy host, workflow engine.
 
 ## License
 
