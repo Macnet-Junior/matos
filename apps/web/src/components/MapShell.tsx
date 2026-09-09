@@ -345,6 +345,10 @@ export function MapShell({ initial }: { initial: MapPayload }) {
         onEditDepartment={(department) =>
           setDeptModal({ mode: "edit", department })
         }
+        onMapUpdate={(next, skill) => {
+          applyMap(next);
+          setSelection({ kind: "skill", skill });
+        }}
       />
 
       <SkillFormModal

@@ -3,6 +3,7 @@ import { prisma } from "@matos/db";
 import { requireOwner } from "@/lib/owner";
 import { updateSkillSchema } from "@/lib/validation";
 import { appendActivity, loadMapPayload, toSkillDTO } from "@/lib/map-data";
+import { deriveSkillStatus } from "@/lib/knowledge";
 
 export const dynamic = "force-dynamic";
 
@@ -74,6 +75,17 @@ export async function PATCH(req: Request, ctx: Ctx) {
     });
   });
 
+  let dto = toSkillDTO(skill);
+  const derived = await deriveSkillStatus(dto);
+  if (derived !== dto.status) {
+    const synced = await prisma.skill.update({
+      where: { id: skill.id },
+      data: { status: derived },
+      include: { knowledge: true },
+    });
+    dto = toSkillDTO(synced);
+  }
+
   await appendActivity({
     action: "skill.update",
     entityType: "skill",
@@ -84,5 +96,5 @@ export async function PATCH(req: Request, ctx: Ctx) {
   });
 
   const map = await loadMapPayload(gate.email);
-  return NextResponse.json({ skill: toSkillDTO(skill), map });
+  return NextResponse.json({ skill: dto, map });
 }

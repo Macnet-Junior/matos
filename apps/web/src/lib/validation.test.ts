@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { parseEvidenceLinks } from "@matos/db";
 import {
   createDepartmentSchema,
   createSkillSchema,
@@ -48,6 +49,23 @@ describe("Zod validation", () => {
     });
     expect(parsed.success).toBe(true);
   });
+
+  it("accepts evidence link objects", () => {
+    const parsed = updateSkillSchema.safeParse({
+      evidence: [
+        { url: "https://example.com/proof", label: "Proof" },
+        { url: "knowledge/brand/voice.md", label: "Voice" },
+      ],
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it("rejects evidence without url/label", () => {
+    const parsed = updateSkillSchema.safeParse({
+      evidence: [{ url: "", label: "x" }],
+    });
+    expect(parsed.success).toBe(false);
+  });
 });
 
 describe("map helpers", () => {
@@ -84,5 +102,21 @@ describe("map helpers", () => {
     expect(a.departments).toHaveLength(2);
     expect(a.skills).toHaveLength(3);
     expect(a.company.posX).toBe(320);
+  });
+});
+
+describe("parseEvidenceLinks", () => {
+  it("parses objects and legacy strings", () => {
+    expect(
+      parseEvidenceLinks(
+        JSON.stringify([
+          { url: "https://a.test", label: "A" },
+          "legacy-note",
+        ]),
+      ),
+    ).toEqual([
+      { url: "https://a.test", label: "A" },
+      { url: "legacy-note", label: "legacy-note" },
+    ]);
   });
 });

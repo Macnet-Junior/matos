@@ -42,3 +42,38 @@ export function parseJsonObject(raw: string): Record<string, unknown> {
     return {};
   }
 }
+
+export type EvidenceLink = { url: string; label: string };
+
+/**
+ * Parse evidenceJson. Accepts [{url,label}, ...] and legacy string[]
+ * (bare strings become {url,label} with the same value).
+ */
+export function parseEvidenceLinks(raw: string): EvidenceLink[] {
+  try {
+    const value = JSON.parse(raw) as unknown;
+    if (!Array.isArray(value)) return [];
+    const out: EvidenceLink[] = [];
+    for (const item of value) {
+      if (typeof item === "string") {
+        const trimmed = item.trim();
+        if (!trimmed) continue;
+        out.push({ url: trimmed, label: trimmed });
+        continue;
+      }
+      if (item && typeof item === "object") {
+        const rec = item as Record<string, unknown>;
+        const url = typeof rec.url === "string" ? rec.url.trim() : "";
+        const label =
+          typeof rec.label === "string" && rec.label.trim()
+            ? rec.label.trim()
+            : url;
+        if (!url) continue;
+        out.push({ url, label });
+      }
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}

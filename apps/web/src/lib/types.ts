@@ -16,6 +16,11 @@ export interface KnowledgeLinkDTO {
   sortOrder: number;
 }
 
+export interface EvidenceLinkDTO {
+  url: string;
+  label: string;
+}
+
 export interface SkillDTO {
   id: string;
   departmentId: string;
@@ -28,7 +33,7 @@ export interface SkillDTO {
   purpose: string;
   instructions: string;
   steps: string[];
-  evidence: string[];
+  evidence: EvidenceLinkDTO[];
   knowledge: KnowledgeLinkDTO[];
   posX: number | null;
   posY: number | null;
@@ -71,4 +76,27 @@ export interface MapPayload {
   departments: DepartmentDTO[];
   stats: MapStats;
   isOwner: boolean;
+}
+
+export type EncodingCheckId =
+  | "purpose"
+  | "steps"
+  | "reviewGate"
+  | "knowledge";
+
+export interface EncodingCheck {
+  id: EncodingCheckId;
+  label: string;
+  pass: boolean;
+  detail: string;
+}
+
+export interface SkillEncodingResult {
+  skillId: string;
+  slug: string;
+  title: string;
+  department: string;
+  status: SkillStatus;
+  checks: EncodingCheck[];
+  pass: boolean;
 }

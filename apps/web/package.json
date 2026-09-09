@@ -14,13 +14,14 @@
     "db:seed": "pnpm --filter @matos/db seed"
   },
   "dependencies": {
+    "@matos/db": "workspace:*",
     "@matos/ui": "workspace:*",
     "@xyflow/react": "^12.4.4",
     "next": "^15.2.0",
     "next-auth": "5.0.0-beta.25",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "@matos/db": "workspace:*",
+    "react-markdown": "^10.1.0",
     "zod": "^3.24.2"
   },
   "devDependencies": {

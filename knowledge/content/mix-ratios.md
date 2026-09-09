@@ -1,6 +1,6 @@
 # Content mix ratios
 
-Default 30-day calendar mix for Content Studio:
+Default 30-day calendar mix for Content Studio / Calendar & Queue:
 
 | Lane | Share | Notes |
 |---|---|---|
@@ -10,4 +10,4 @@ Default 30-day calendar mix for Content Studio:
 | Process / behind | 15% | How the map and skills work |
 | Community / reply | 10% | Questions, stitches, comments |
 
-Adjust per campaign in `content-calendar` skill instructions.
+Adjust per campaign in `content-calendar` skill instructions. Rebalance toward proof when a launch week needs receipts.

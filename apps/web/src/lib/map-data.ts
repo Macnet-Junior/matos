@@ -1,4 +1,5 @@
 import {
+  parseEvidenceLinks,
   parseJsonArray,
   parseJsonObject,
   prisma,
@@ -16,7 +17,7 @@ import type {
   ReviewGate,
 } from "./types";
 import { computeStats } from "./map-layout";
-import { withDerivedStatuses } from "./knowledge";
+import { reconcileSkillStatuses, withDerivedStatuses } from "./knowledge";
 
 export { computeStats, computeAutoArrange } from "./map-layout";
 
@@ -52,7 +53,7 @@ export function toSkillDTO(skill: SkillRow): SkillDTO {
     purpose: skill.purpose,
     instructions: skill.instructions,
     steps: parseJsonArray(skill.stepsJson),
-    evidence: parseJsonArray(skill.evidenceJson),
+    evidence: parseEvidenceLinks(skill.evidenceJson),
     knowledge: skill.knowledge
       .slice()
       .sort((a, b) => a.sortOrder - b.sortOrder)
@@ -87,6 +88,7 @@ export function toDepartmentDTO(dept: DeptRow): DepartmentDTO {
 
 export async function loadMapPayload(
   viewerEmail?: string | null,
+  opts?: { reconcile?: boolean },
 ): Promise<MapPayload> {
   const company = await prisma.company.findFirst({
     include: {
@@ -114,6 +116,13 @@ export async function loadMapPayload(
   };
 
   const baseDepartments = company.departments.map(toDepartmentDTO);
+  const allSkills = baseDepartments.flatMap((d) => d.skills);
+
+  // Optionally sync DB status with derived Authored/Planned/Missing.
+  if (opts?.reconcile !== false) {
+    await reconcileSkillStatuses(allSkills);
+  }
+
   const departments = await Promise.all(
     baseDepartments.map(async (d) => ({
       ...d,

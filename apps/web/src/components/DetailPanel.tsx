@@ -2,7 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { Badge, Button } from "@matos/ui";
-import type { DepartmentDTO, SkillDTO, SkillStatus } from "@/lib/types";
+import type {
+  DepartmentDTO,
+  EvidenceLinkDTO,
+  MapPayload,
+  SkillDTO,
+  SkillStatus,
+} from "@/lib/types";
+import { MarkdownView } from "./MarkdownView";
 
 type Tab = "instructions" | "knowledge" | "evidence";
 
@@ -24,12 +31,19 @@ function statusLabel(status: SkillStatus): string {
   return "Planned";
 }
 
-
-function KnowledgeTab({ paths }: { paths: { id: string; path: string; title: string | null }[] }) {
+function KnowledgeTab({
+  paths,
+}: {
+  paths: { id: string; path: string; title: string | null }[];
+}) {
   const [active, setActive] = useState<string | null>(paths[0]?.path ?? null);
   const [content, setContent] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setActive(paths[0]?.path ?? null);
+  }, [paths]);
 
   useEffect(() => {
     if (!active) {
@@ -77,14 +91,157 @@ function KnowledgeTab({ paths }: { paths: { id: string; path: string; title: str
           }`}
         >
           {k.title ? (
-            <div className="mb-1 font-sans text-[11px] text-matos-text">{k.title}</div>
+            <div className="mb-1 font-sans text-[11px] text-matos-text">
+              {k.title}
+            </div>
           ) : null}
           {k.path}
         </button>
       ))}
-      <div className="min-h-[120px] rounded-lg border border-matos-soft bg-matos-bg p-2.5 text-[11px] leading-relaxed text-matos-muted whitespace-pre-wrap">
-        {loading ? "Loading…" : error ? error : content || "Select a knowledge file."}
+      <div className="min-h-[120px] rounded-lg border border-matos-soft bg-matos-bg p-2.5">
+        {loading ? (
+          <p className="text-[11px] text-matos-muted">Loading…</p>
+        ) : error ? (
+          <p className="text-[11px] text-matos-danger">{error}</p>
+        ) : (
+          <MarkdownView content={content} />
+        )}
       </div>
+    </div>
+  );
+}
+
+function EvidenceTab({
+  skill,
+  isOwner,
+  onMapUpdate,
+}: {
+  skill: SkillDTO;
+  isOwner: boolean;
+  onMapUpdate?: (map: MapPayload, skill: SkillDTO) => void;
+}) {
+  const [label, setLabel] = useState("");
+  const [url, setUrl] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function persist(next: EvidenceLinkDTO[]) {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/skills/${skill.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ evidence: next }),
+      });
+      const data = (await res.json()) as {
+        error?: string;
+        map?: MapPayload;
+        skill?: SkillDTO;
+      };
+      if (!res.ok) throw new Error(data.error ?? "Save failed");
+      if (data.map && data.skill && onMapUpdate) {
+        onMapUpdate(data.map, data.skill);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function addLink(e: React.FormEvent) {
+    e.preventDefault();
+    const nextLabel = label.trim();
+    const nextUrl = url.trim();
+    if (!nextLabel || !nextUrl) {
+      setError("Label and URL required");
+      return;
+    }
+    await persist([...skill.evidence, { label: nextLabel, url: nextUrl }]);
+    setLabel("");
+    setUrl("");
+  }
+
+  async function removeAt(index: number) {
+    const next = skill.evidence.filter((_, i) => i !== index);
+    await persist(next);
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {skill.evidence.length === 0 ? (
+        <p className="text-xs text-matos-muted2">No evidence links yet.</p>
+      ) : (
+        skill.evidence.map((item, index) => (
+          <div
+            key={`${item.url}-${index}`}
+            className="flex items-start justify-between gap-2 rounded-lg border border-matos-soft bg-matos-panel px-2.5 py-2"
+          >
+            <div className="min-w-0">
+              <div className="text-xs font-medium text-matos-text">
+                {item.label}
+              </div>
+              <a
+                href={item.url.startsWith("knowledge/") ? "#" : item.url}
+                className="mt-0.5 block truncate font-mono text-[10px] text-matos-citron"
+                target={item.url.startsWith("http") ? "_blank" : undefined}
+                rel={item.url.startsWith("http") ? "noreferrer" : undefined}
+                onClick={(e) => {
+                  if (item.url.startsWith("knowledge/")) e.preventDefault();
+                }}
+                title={item.url}
+              >
+                {item.url}
+              </a>
+            </div>
+            {isOwner && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => removeAt(index)}
+                className="shrink-0 text-[10px] text-matos-muted hover:text-matos-danger"
+              >
+                Remove
+              </button>
+            )}
+          </div>
+        ))
+      )}
+
+      {isOwner && (
+        <form
+          onSubmit={addLink}
+          className="mt-1 grid gap-2 rounded-lg border border-matos-soft bg-matos-bg p-2.5"
+        >
+          <div className="text-[10px] uppercase tracking-wide text-matos-muted2">
+            Add evidence link
+          </div>
+          <input
+            className="rounded-lg border border-matos-border bg-matos-panel px-2 py-1.5 text-xs"
+            placeholder="Label"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            disabled={busy}
+          />
+          <input
+            className="rounded-lg border border-matos-border bg-matos-panel px-2 py-1.5 font-mono text-[11px]"
+            placeholder="https://… or knowledge/…"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            disabled={busy}
+          />
+          <Button type="submit" variant="secondary" disabled={busy}>
+            {busy ? "Saving…" : "Add link"}
+          </Button>
+        </form>
+      )}
+
+      {error && (
+        <p className="text-[11px] text-matos-danger" role="alert">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
@@ -95,12 +252,14 @@ export function DetailPanel({
   isOwner,
   onEditSkill,
   onEditDepartment,
+  onMapUpdate,
 }: {
   selection: Selection;
   departments: DepartmentDTO[];
   isOwner: boolean;
   onEditSkill?: (skill: SkillDTO) => void;
   onEditDepartment?: (department: DepartmentDTO) => void;
+  onMapUpdate?: (map: MapPayload, skill: SkillDTO) => void;
 }) {
   const [tab, setTab] = useState<Tab>("instructions");
   const [toast, setToast] = useState<string | null>(null);
@@ -136,7 +295,7 @@ export function DetailPanel({
           </div>
           <div className="flex justify-between">
             <span className="text-matos-muted2">Phase</span>
-            <b>1 · Map data</b>
+            <b>2 · Knowledge</b>
           </div>
           <div className="flex justify-between">
             <span className="text-matos-muted2">Departments</span>
@@ -257,9 +416,7 @@ export function DetailPanel({
         {tab === "instructions" && (
           <>
             {skill.instructions ? (
-              <p className="text-xs leading-relaxed text-matos-muted">
-                {skill.instructions}
-              </p>
+              <MarkdownView content={skill.instructions} />
             ) : (
               <p className="text-xs text-matos-muted2">No instructions yet.</p>
             )}
@@ -273,16 +430,13 @@ export function DetailPanel({
           </>
         )}
         {tab === "knowledge" && <KnowledgeTab paths={skill.knowledge} />}
-        {tab === "evidence" &&
-          (skill.evidence.length ? (
-            skill.evidence.map((line) => (
-              <p key={line} className="text-xs text-matos-muted">
-                {line}
-              </p>
-            ))
-          ) : (
-            <p className="text-xs text-matos-muted2">No evidence yet.</p>
-          ))}
+        {tab === "evidence" && (
+          <EvidenceTab
+            skill={skill}
+            isOwner={isOwner}
+            onMapUpdate={onMapUpdate}
+          />
+        )}
       </div>
 
       {toast && (
@@ -293,7 +447,11 @@ export function DetailPanel({
 
       <div className="mt-auto flex flex-col gap-2">
         {isOwner && onEditSkill && (
-          <Button variant="secondary" className="w-full" onClick={() => onEditSkill(skill)}>
+          <Button
+            variant="secondary"
+            className="w-full"
+            onClick={() => onEditSkill(skill)}
+          >
             Edit skill
           </Button>
         )}

@@ -39,4 +39,19 @@ describe("SQLite map payload", () => {
       ]),
     );
   });
+
+  it("links etsy checklist and offers on etsy-listing-lab", async () => {
+    const map = await loadMapPayload(null);
+    const etsy = map.departments
+      .flatMap((d) => d.skills)
+      .find((s) => s.slug === "etsy-listing-lab");
+    expect(etsy?.status).toBe("authored");
+    expect(etsy?.knowledge.map((k) => k.path)).toEqual(
+      expect.arrayContaining([
+        "knowledge/content/etsy-listing-checklist.md",
+        "knowledge/monetization/offers.md",
+      ]),
+    );
+    expect(etsy?.evidence[0]?.label).toBeTruthy();
+  });
 });

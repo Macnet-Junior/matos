@@ -3,6 +3,22 @@ import { z } from "zod";
 export const skillStatusSchema = z.enum(["authored", "planned", "missing"]);
 export const reviewGateSchema = z.enum(["Cold", "Warm", "Hot"]);
 
+const evidenceLinkSchema = z.object({
+  url: z
+    .string()
+    .trim()
+    .min(1)
+    .max(500)
+    .refine(
+      (v) =>
+        /^https?:\/\//i.test(v) ||
+        v.startsWith("/") ||
+        v.startsWith("knowledge/"),
+      "url must be http(s), absolute path, or knowledge/ path",
+    ),
+  label: z.string().trim().min(1).max(120),
+});
+
 export const createDepartmentSchema = z.object({
   name: z.string().trim().min(2).max(80),
   summary: z.string().trim().min(2).max(240),
@@ -36,7 +52,7 @@ export const createSkillSchema = z.object({
   purpose: z.string().trim().max(500).optional(),
   instructions: z.string().trim().max(8000).optional(),
   steps: z.array(z.string().trim().min(1).max(400)).max(40).optional(),
-  evidence: z.array(z.string().trim().min(1).max(400)).max(40).optional(),
+  evidence: z.array(evidenceLinkSchema).max(40).optional(),
   knowledgePaths: z
     .array(z.string().trim().min(1).max(200))
     .max(20)
@@ -52,7 +68,7 @@ export const updateSkillSchema = z.object({
   purpose: z.string().trim().max(500).optional(),
   instructions: z.string().trim().max(8000).optional(),
   steps: z.array(z.string().trim().min(1).max(400)).max(40).optional(),
-  evidence: z.array(z.string().trim().min(1).max(400)).max(40).optional(),
+  evidence: z.array(evidenceLinkSchema).max(40).optional(),
   knowledgePaths: z
     .array(z.string().trim().min(1).max(200))
     .max(20)
@@ -92,3 +108,5 @@ export const layoutSchema = z.object({
 export const autoArrangeSchema = z.object({
   expandAll: z.boolean().optional(),
 });
+
+export { evidenceLinkSchema };

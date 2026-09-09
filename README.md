@@ -2,7 +2,7 @@
 
 **MatOS** is a company operating layer: a precision dark workspace where your agency is modeled as a living map of departments and authored skills.
 
-Phase 1 ships a SQLite-backed company map (Prisma), owner-gated CRUD, search, auto-arrange, activity log, and Citron Volt UI.
+Phase 2 ships a SQLite-backed company map with knowledge markdown, evidence links, status reconcile, encoding checklist, owner CRUD, and Citron Volt UI.
 
 ## Design
 

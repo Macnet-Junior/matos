@@ -1,6 +1,12 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import type { SkillDTO, SkillStatus } from "./types";
+import { prisma } from "@matos/db";
+import type {
+  EncodingCheck,
+  SkillDTO,
+  SkillEncodingResult,
+  SkillStatus,
+} from "./types";
 
 /** Repo root: apps/web -> ../.. */
 export function repoRoot(): string {
@@ -73,4 +79,90 @@ export async function withDerivedStatuses(
       status: await deriveSkillStatus(skill),
     })),
   );
+}
+
+/**
+ * Persist derived statuses when they differ from DB so edits stay accurate.
+ * Returns number of rows updated.
+ */
+export async function reconcileSkillStatuses(
+  skills: SkillDTO[],
+): Promise<number> {
+  let updated = 0;
+  for (const skill of skills) {
+    const derived = await deriveSkillStatus(skill);
+    if (derived !== skill.status) {
+      await prisma.skill.update({
+        where: { id: skill.id },
+        data: { status: derived },
+      });
+      updated += 1;
+    }
+  }
+  return updated;
+}
+
+/** Encoding guide checklist: purpose, steps, review gate, ≥1 knowledge link. */
+export function evaluateSkillEncoding(
+  skill: Pick<
+    SkillDTO,
+    | "id"
+    | "slug"
+    | "title"
+    | "status"
+    | "purpose"
+    | "steps"
+    | "reviewGate"
+    | "knowledge"
+  >,
+  department: string,
+): SkillEncodingResult {
+  const checks: EncodingCheck[] = [
+    {
+      id: "purpose",
+      label: "Purpose",
+      pass: skill.purpose.trim().length > 0,
+      detail:
+        skill.purpose.trim().length > 0
+          ? "Purpose present"
+          : "Add a one-sentence purpose",
+    },
+    {
+      id: "steps",
+      label: "Steps",
+      pass: skill.steps.length > 0,
+      detail:
+        skill.steps.length > 0
+          ? `${skill.steps.length} step(s)`
+          : "Add at least one ordered step",
+    },
+    {
+      id: "reviewGate",
+      label: "Review gate",
+      pass:
+        skill.reviewGate === "Cold" ||
+        skill.reviewGate === "Warm" ||
+        skill.reviewGate === "Hot",
+      detail: `Gate: ${skill.reviewGate}`,
+    },
+    {
+      id: "knowledge",
+      label: "Knowledge link",
+      pass: skill.knowledge.length >= 1,
+      detail:
+        skill.knowledge.length >= 1
+          ? `${skill.knowledge.length} link(s)`
+          : "Link ≥1 knowledge/ file",
+    },
+  ];
+
+  return {
+    skillId: skill.id,
+    slug: skill.slug,
+    title: skill.title,
+    department,
+    status: skill.status,
+    checks,
+    pass: checks.every((c) => c.pass),
+  };
 }

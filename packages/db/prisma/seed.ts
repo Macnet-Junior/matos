@@ -11,7 +11,7 @@ type SeedSkill = {
   purpose?: string;
   instructions?: string;
   steps?: string[];
-  evidence?: string[];
+  evidence?: { url: string; label: string }[];
   knowledge?: { path: string; title?: string }[];
 };
 
@@ -39,6 +39,9 @@ const DEPARTMENTS: SeedDept[] = [
         description: "Ranked niche angles from X/TikTok/YouTube/search.",
         status: "planned",
         purpose: "Decide what is worth making this week.",
+        knowledge: [
+          { path: "knowledge/research/notes.md", title: "Research notes" },
+        ],
       },
       {
         slug: "competitor-gap",
@@ -51,13 +54,22 @@ const DEPARTMENTS: SeedDept[] = [
         title: "Voice Miner",
         description: "Learn brand phrasing from Git knowledge + winners.",
         status: "planned",
-        knowledge: [{ path: "knowledge/brand/voice.md", title: "Brand voice" }],
+        purpose: "Extract reusable phrasing from brand voice and winning posts.",
+        knowledge: [
+          { path: "knowledge/brand/voice.md", title: "Brand voice" },
+          { path: "knowledge/research/notes.md", title: "Research notes" },
+        ],
       },
       {
         slug: "offer-fit",
         title: "Offer Fit",
         description: "Map an angle to a product or lead magnet you sell.",
         status: "planned",
+        purpose: "Connect a research angle to a concrete offer rung.",
+        knowledge: [
+          { path: "knowledge/monetization/offers.md", title: "Offers" },
+          { path: "knowledge/research/notes.md", title: "Research notes" },
+        ],
       },
     ],
   },
@@ -85,7 +97,12 @@ const DEPARTMENTS: SeedDept[] = [
           "Score and shortlist top 3 for production",
           "Queue Warm review before calendar placement",
         ],
-        evidence: ["No published runs yet — Phase 1 seed."],
+        evidence: [
+          {
+            url: "knowledge/brand/voice.md",
+            label: "Brand voice source",
+          },
+        ],
         knowledge: [{ path: "knowledge/brand/voice.md", title: "Brand voice" }],
       },
       {
@@ -104,8 +121,16 @@ const DEPARTMENTS: SeedDept[] = [
           "Attach CTA and knowledge links",
           "Submit for Warm review",
         ],
-        evidence: ["No published runs yet — Phase 1 seed."],
-        knowledge: [{ path: "knowledge/brand/voice.md", title: "Brand voice" }],
+        evidence: [
+          {
+            url: "knowledge/brand/voice.md",
+            label: "Brand voice source",
+          },
+        ],
+        knowledge: [
+          { path: "knowledge/brand/voice.md", title: "Brand voice" },
+          { path: "knowledge/content/mix-ratios.md", title: "Mix ratios" },
+        ],
       },
       {
         slug: "long-script",
@@ -190,7 +215,12 @@ const DEPARTMENTS: SeedDept[] = [
           "Link skills and knowledge sources",
           "Queue Warm review before publish handoff",
         ],
-        evidence: ["No published runs yet — Phase 1 seed."],
+        evidence: [
+          {
+            url: "knowledge/content/mix-ratios.md",
+            label: "Mix ratios reference",
+          },
+        ],
         knowledge: [
           { path: "knowledge/brand/voice.md", title: "Brand voice" },
           { path: "knowledge/content/mix-ratios.md", title: "Mix ratios" },
@@ -274,6 +304,10 @@ const DEPARTMENTS: SeedDept[] = [
         title: "Offer Ladder",
         description: "Free → low ticket → high ticket mapped to posts.",
         status: "planned",
+        purpose: "Keep every CTA on a named rung of the ladder.",
+        knowledge: [
+          { path: "knowledge/monetization/offers.md", title: "Offers" },
+        ],
       },
       {
         slug: "cta-router",
@@ -315,10 +349,20 @@ const DEPARTMENTS: SeedDept[] = [
           "Cross-check against etsy-stub knowledge",
           "Queue Warm review — no live publish",
         ],
-        evidence: ["Etsy API deferred — stub only."],
+        evidence: [
+          {
+            url: "knowledge/content/etsy-listing-checklist.md",
+            label: "Etsy listing checklist",
+          },
+        ],
         knowledge: [
+          {
+            path: "knowledge/content/etsy-listing-checklist.md",
+            title: "Etsy listing checklist",
+          },
           { path: "knowledge/content/etsy-stub.md", title: "Etsy stub" },
           { path: "knowledge/brand/voice.md", title: "Brand voice" },
+          { path: "knowledge/monetization/offers.md", title: "Offers" },
         ],
       },
     ],
@@ -426,7 +470,7 @@ async function main() {
       entityId: company.id,
       summary: "Seeded MatOS Agency with 7 departments and commercial-plan skills",
       actorEmail: "system@matos.local",
-      payloadJson: JSON.stringify({ phase: 1 }),
+      payloadJson: JSON.stringify({ phase: 2 }),
     },
   });
 

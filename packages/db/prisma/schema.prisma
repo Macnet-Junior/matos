@@ -53,7 +53,7 @@ model Skill {
   instructions String   @default("")
   /// JSON array of step strings
   stepsJson    String   @default("[]")
-  /// JSON array of evidence strings
+  /// JSON array of evidence links: {url,label}[] (legacy string[] accepted on read)
   evidenceJson String   @default("[]")
   posX         Float?
   posY         Float?

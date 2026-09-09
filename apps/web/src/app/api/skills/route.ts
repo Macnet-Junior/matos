@@ -3,6 +3,7 @@ import { prisma } from "@matos/db";
 import { requireOwner } from "@/lib/owner";
 import { createSkillSchema } from "@/lib/validation";
 import { appendActivity, loadMapPayload, toSkillDTO } from "@/lib/map-data";
+import { deriveSkillStatus } from "@/lib/knowledge";
 
 export const dynamic = "force-dynamic";
 
@@ -57,17 +58,28 @@ export async function POST(req: Request) {
       data: { expanded: true },
     });
 
+    let dto = toSkillDTO(skill);
+    const derived = await deriveSkillStatus(dto);
+    if (derived !== dto.status) {
+      const synced = await prisma.skill.update({
+        where: { id: skill.id },
+        data: { status: derived },
+        include: { knowledge: true },
+      });
+      dto = toSkillDTO(synced);
+    }
+
     await appendActivity({
       action: "skill.create",
       entityType: "skill",
       entityId: skill.id,
       summary: `Created skill ${skill.slug}`,
       actorEmail: gate.email,
-      payload: { departmentId: dept.id, status: skill.status },
+      payload: { departmentId: dept.id, status: dto.status },
     });
 
     const map = await loadMapPayload(gate.email);
-    return NextResponse.json({ skill: toSkillDTO(skill), map }, { status: 201 });
+    return NextResponse.json({ skill: dto, map }, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Create failed";
     if (message.includes("Unique constraint")) {

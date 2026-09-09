@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { deriveSkillStatus, resolveKnowledgePath } from "./knowledge";
+import {
+  deriveSkillStatus,
+  evaluateSkillEncoding,
+  resolveKnowledgePath,
+} from "./knowledge";
+import type { SkillDTO } from "./types";
 
 describe("knowledge paths", () => {
   it("allows knowledge/ paths and blocks traversal", () => {
@@ -38,5 +43,51 @@ describe("deriveSkillStatus", () => {
       status: "authored",
     });
     expect(status).toBe("missing");
+  });
+});
+
+describe("evaluateSkillEncoding", () => {
+  const base: Pick<
+    SkillDTO,
+    | "id"
+    | "slug"
+    | "title"
+    | "status"
+    | "purpose"
+    | "steps"
+    | "reviewGate"
+    | "knowledge"
+  > = {
+    id: "skill-x",
+    slug: "hook-lab",
+    title: "Hook Lab",
+    status: "authored",
+    purpose: "Earn the scroll-stop",
+    steps: ["Draft", "Score"],
+    reviewGate: "Warm",
+    knowledge: [
+      {
+        id: "k1",
+        path: "knowledge/brand/voice.md",
+        title: "Brand voice",
+        sortOrder: 0,
+      },
+    ],
+  };
+
+  it("passes when purpose, steps, gate, and knowledge exist", () => {
+    const result = evaluateSkillEncoding(base, "Script & Story");
+    expect(result.pass).toBe(true);
+    expect(result.checks.every((c) => c.pass)).toBe(true);
+  });
+
+  it("fails when purpose or knowledge missing", () => {
+    const result = evaluateSkillEncoding(
+      { ...base, purpose: "", knowledge: [] },
+      "Script & Story",
+    );
+    expect(result.pass).toBe(false);
+    expect(result.checks.find((c) => c.id === "purpose")?.pass).toBe(false);
+    expect(result.checks.find((c) => c.id === "knowledge")?.pass).toBe(false);
   });
 });
