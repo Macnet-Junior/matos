@@ -15,7 +15,7 @@ export default async function Page() {
       <div className="border-b border-matos-soft px-[22px] py-4">
         <h1 className="text-base font-semibold tracking-tight">Activity</h1>
         <p className="mt-1.5 max-w-xl text-xs text-matos-muted">
-          Append-only trail of map mutations and layout changes.
+          Append-only trail of map mutations, workflow create/run/approve, and layout changes.
         </p>
       </div>
       <div className="space-y-2 overflow-auto p-[22px]">

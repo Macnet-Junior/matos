@@ -21,6 +21,10 @@ export type {
   Skill,
   SkillKnowledge,
   ActivityEvent,
+  Workflow,
+  WorkflowStep,
+  WorkflowRun,
+  RunStep,
 } from "@prisma/client";
 
 export function parseJsonArray(raw: string): string[] {

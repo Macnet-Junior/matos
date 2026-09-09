@@ -16,6 +16,7 @@ const build = [
   { href: "/skills", label: "Skills" },
   { href: "/knowledge", label: "Knowledge" },
   { href: "/activity", label: "Activity" },
+  { href: "/settings/channels", label: "Channels" },
 ];
 
 const library = [

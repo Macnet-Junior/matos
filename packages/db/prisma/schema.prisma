@@ -8,13 +8,13 @@ datasource db {
 }
 
 model Company {
-  id        String       @id @default(cuid())
-  name      String
-  summary   String
-  posX      Float        @default(280)
-  posY      Float        @default(220)
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  id          String       @id @default(cuid())
+  name        String
+  summary     String
+  posX        Float        @default(280)
+  posY        Float        @default(220)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
   departments Department[]
 }
 
@@ -47,7 +47,7 @@ model Skill {
   /// authored | planned | missing
   status       String   @default("planned")
   owner        String   @default("Macnet Junior")
-  /// Cold | Warm | Hot
+  /// Cold | Warm | Hot — required review intensity for the skill
   reviewGate   String   @default("Warm")
   purpose      String   @default("")
   instructions String   @default("")
@@ -60,6 +60,7 @@ model Skill {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   knowledge    SkillKnowledge[]
+  workflowSteps WorkflowStep[]
 
   @@unique([departmentId, slug])
   @@index([departmentId])
@@ -80,16 +81,89 @@ model SkillKnowledge {
 }
 
 model ActivityEvent {
-  id         String   @id @default(cuid())
-  action     String
-  entityType String
-  entityId   String
-  summary    String
-  actorEmail String?
+  id          String   @id @default(cuid())
+  action      String
+  entityType  String
+  entityId    String
+  summary     String
+  actorEmail  String?
   /// JSON payload
-  payloadJson String  @default("{}")
-  createdAt  DateTime @default(now())
+  payloadJson String   @default("{}")
+  createdAt   DateTime @default(now())
 
   @@index([createdAt])
   @@index([entityType, entityId])
+}
+
+/// Ordered skill chain. Content gate: draft → warm → approved → scheduled → published
+model Workflow {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  description String   @default("")
+  /// draft | warm | approved | scheduled | published
+  gateState   String   @default("draft")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  steps       WorkflowStep[]
+  runs        WorkflowRun[]
+}
+
+model WorkflowStep {
+  id         String   @id @default(cuid())
+  workflowId String
+  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  skillId    String
+  skill      Skill    @relation(fields: [skillId], references: [id], onDelete: Restrict)
+  sortOrder  Int
+  label      String?
+  createdAt  DateTime @default(now())
+
+  @@unique([workflowId, sortOrder])
+  @@index([workflowId])
+  @@index([skillId])
+}
+
+model WorkflowRun {
+  id           String   @id @default(cuid())
+  workflowId   String
+  workflow     Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  /// running | completed | failed | blocked
+  status       String   @default("running")
+  /// draft | warm | approved | scheduled | published
+  gateState    String   @default("draft")
+  dryRun       Boolean  @default(true)
+  summary      String   @default("")
+  /// JSON aggregate artifacts / trace meta
+  artifactJson String   @default("{}")
+  startedAt    DateTime @default(now())
+  finishedAt   DateTime?
+  actorEmail   String?
+  steps        RunStep[]
+
+  @@index([workflowId])
+  @@index([startedAt])
+  @@index([gateState])
+}
+
+model RunStep {
+  id             String   @id @default(cuid())
+  runId          String
+  run            WorkflowRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  workflowStepId String?
+  skillId        String
+  skillSlug      String
+  skillTitle     String
+  sortOrder      Int
+  /// pending | running | completed | skipped | blocked
+  status         String   @default("pending")
+  /// draft | warm | approved | scheduled | published
+  gateState      String   @default("draft")
+  logJson        String   @default("[]")
+  artifactJson   String   @default("{}")
+  startedAt      DateTime?
+  finishedAt     DateTime?
+
+  @@index([runId])
+  @@index([sortOrder])
 }

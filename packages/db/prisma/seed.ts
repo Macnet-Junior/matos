@@ -397,6 +397,10 @@ const DEPARTMENTS: SeedDept[] = [
 ];
 
 async function main() {
+  await prisma.runStep.deleteMany();
+  await prisma.workflowRun.deleteMany();
+  await prisma.workflowStep.deleteMany();
+  await prisma.workflow.deleteMany();
   await prisma.activityEvent.deleteMany();
   await prisma.skillKnowledge.deleteMany();
   await prisma.skill.deleteMany();
@@ -463,14 +467,80 @@ async function main() {
     }
   }
 
+  // --- Phase 3 workflows ---
+  await prisma.runStep.deleteMany();
+  await prisma.workflowRun.deleteMany();
+  await prisma.workflowStep.deleteMany();
+  await prisma.workflow.deleteMany();
+
+  const skillBySlug = async (slug: string) => {
+    const s = await prisma.skill.findFirst({ where: { slug } });
+    if (!s) throw new Error(`Missing skill for workflow seed: ${slug}`);
+    return s;
+  };
+
+  const researchToCalendar = await prisma.workflow.create({
+    data: {
+      id: "wf-research-to-calendar",
+      slug: "research-to-calendar",
+      name: "Research → Hook → Caption → Calendar",
+      description:
+        "Dry-run chain from niche research through hooks and captions into a content calendar. Publish stays gated.",
+      gateState: "draft",
+    },
+  });
+
+  const r2cSlugs = ["trend-radar", "hook-lab", "caption-pack", "content-calendar"] as const;
+  for (let i = 0; i < r2cSlugs.length; i++) {
+    const skill = await skillBySlug(r2cSlugs[i]);
+    await prisma.workflowStep.create({
+      data: {
+        id: `wfs-r2c-${i}`,
+        workflowId: researchToCalendar.id,
+        skillId: skill.id,
+        sortOrder: i,
+        label: skill.title,
+      },
+    });
+  }
+
+  const hookToScript = await prisma.workflow.create({
+    data: {
+      id: "wf-hook-to-script",
+      slug: "hook-to-script-calendar",
+      name: "Hook → Short Script → Calendar",
+      description:
+        "Turn a winning hook into a short script and place it on the calendar. Dry-run only.",
+      gateState: "draft",
+    },
+  });
+
+  const h2sSlugs = ["hook-lab", "short-script", "content-calendar"] as const;
+  for (let i = 0; i < h2sSlugs.length; i++) {
+    const skill = await skillBySlug(h2sSlugs[i]);
+    await prisma.workflowStep.create({
+      data: {
+        id: `wfs-h2s-${i}`,
+        workflowId: hookToScript.id,
+        skillId: skill.id,
+        sortOrder: i,
+        label: skill.title,
+      },
+    });
+  }
+
   await prisma.activityEvent.create({
     data: {
       action: "seed",
       entityType: "company",
       entityId: company.id,
-      summary: "Seeded MatOS Agency with 7 departments and commercial-plan skills",
+      summary:
+        "Seeded MatOS Agency with 7 departments, skills, and Phase 3 sample workflows",
       actorEmail: "system@matos.local",
-      payloadJson: JSON.stringify({ phase: 2 }),
+      payloadJson: JSON.stringify({
+        phase: 3,
+        workflows: [researchToCalendar.slug, hookToScript.slug],
+      }),
     },
   });
 
@@ -478,6 +548,8 @@ async function main() {
     departments: await prisma.department.count(),
     skills: await prisma.skill.count(),
     authored: await prisma.skill.count({ where: { status: "authored" } }),
+    workflows: await prisma.workflow.count(),
+    workflowSteps: await prisma.workflowStep.count(),
   };
   console.log("Seed complete:", counts);
 }

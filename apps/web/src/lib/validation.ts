@@ -110,3 +110,34 @@ export const autoArrangeSchema = z.object({
 });
 
 export { evidenceLinkSchema };
+
+export const contentGateSchema = z.enum([
+  "draft",
+  "warm",
+  "approved",
+  "scheduled",
+  "published",
+]);
+
+export const createWorkflowSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  slug: z
+    .string()
+    .trim()
+    .min(2)
+    .max(60)
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "slug must be kebab-case"),
+  description: z.string().trim().max(500).optional(),
+  skillIds: z.array(z.string().trim().min(1)).min(1).max(20),
+});
+
+export const updateWorkflowSchema = z.object({
+  name: z.string().trim().min(2).max(120).optional(),
+  description: z.string().trim().max(500).optional(),
+  skillIds: z.array(z.string().trim().min(1)).min(1).max(20).optional(),
+  gateState: contentGateSchema.optional(),
+});
+
+export const advanceGateSchema = z.object({
+  to: contentGateSchema,
+});

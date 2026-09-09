@@ -2,7 +2,7 @@
 
 **Product:** MatOS  
 **Owner:** Macnet Junior  
-**Phase:** 2 — knowledge, evidence links, encoding checklist  
+**Phase:** 3 — workflows, review gates, dry-run engine, channel stubs  
 **Accent:** Citron Volt `#D6F31F` (hover `#E8FF5A`, pressed `#B8D110`)
 
 ## Intent
@@ -27,13 +27,24 @@ Next.js shell, Auth.js credentials login, React Flow map chrome, Citron design s
 
 ## Phase 2 (done)
 
-1. **Knowledge corpus** — markdown under `knowledge/` (brand voice, mix ratios, Etsy stub + listing checklist, offers, research notes) with skill→file links in SQLite.
-2. **Knowledge reader** — `GET /api/knowledge`; Knowledge page + detail Knowledge tab preview via **react-markdown** (safe render).
+1. **Knowledge corpus** — markdown under `knowledge/` with skill→file links in SQLite.
+2. **Knowledge reader** — `GET /api/knowledge`; Knowledge page + detail Knowledge tab via **react-markdown**.
 3. **Instructions markdown** — skill instructions tab renders markdown the same way.
-4. **Evidence links** — URL + label stored in `evidenceJson`; owner can add/remove in the Evidence tab (no binary uploads).
-5. **Status reconcile** — on map load (and after skill create/update), derived Authored/Planned/Missing is synced back to `skills.status`.
-6. **Encoding guide** — live pass/fail checklist (purpose, steps, review gate, ≥1 knowledge link) for every skill.
-7. Skill authoring form remains the map CRUD modal (purpose, steps, review gate, knowledge paths).
+4. **Evidence links** — URL + label stored in `evidenceJson`; owner add/remove in Evidence tab.
+5. **Status reconcile** — derived Authored/Planned/Missing synced back to `skills.status`.
+6. **Encoding guide** — live pass/fail checklist for every skill.
+7. Skill authoring form remains the map CRUD modal.
+
+## Phase 3 (done)
+
+1. **Workflow model** — `workflows`, `workflow_steps`, `workflow_runs`, `run_steps` via Prisma migration; seed sample chains `research-to-calendar` and `hook-to-script-calendar`.
+2. **Workflows UI** — list + create/edit ordered skill chain; Citron Volt chrome; detail + dry-run.
+3. **Review gates** — content gate `draft → warm → approved → scheduled → published` (published = simulated). Cannot publish without approved.
+4. **Run engine (dry-run)** — execute workflow, step skills, write JSON logs/artifacts, no external posts; run trace UI.
+5. **Integration stubs** — `/settings/channels` lists Late.dev / Etsy / WhatsApp as **Disconnected** with “Connect in Phase 4”. WhatsApp note: Career path + content creation monetization only when live later.
+6. **Home digest** — pending review gates + recent activity + last run summary.
+7. Activity events for workflow create / run / approve.
+8. Tests + CI green.
 
 ## Departments (7)
 
@@ -58,9 +69,9 @@ Center node: **MatOS Agency**.
 
 Etsy remains a **stub** — no live marketplace API.
 
-## Phase 3 (not started)
+## Phase 4 (not started)
 
-Deferred integrations: Late.dev, Etsy OAuth, WhatsApp, Stripe, workflow execution.
+Live Late.dev / Etsy OAuth / WhatsApp (scoped) / Stripe — still deferred. No secrets in repo.
 
 ## Hosting
 
@@ -68,10 +79,9 @@ Host / deploy deferred. Local `pnpm dev` is the delivery surface.
 
 ## Non-goals
 
-- Live social / Etsy / Stripe integrations  
-- Workflow engine execution  
+- Live social / Etsy / Stripe / WhatsApp Web automation  
 - Production OAuth providers  
 
 ## Success
 
-Remote `main` runs install → migrate → seed → typecheck → test → `pnpm dev`, Citron aesthetic parity, DB-backed company map with knowledge + evidence + encoding checklist after owner login (`macnet@matos.local` / `dev`).
+Remote `main` runs install → migrate → seed → typecheck → test → `pnpm dev`, Citron aesthetic parity, DB-backed map + knowledge + workflows with dry-run and review gates after owner login (`macnet@matos.local` / `dev`).

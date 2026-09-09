@@ -2,7 +2,7 @@
 
 **MatOS** is a company operating layer: a precision dark workspace where your agency is modeled as a living map of departments and authored skills.
 
-Phase 2 ships a SQLite-backed company map with knowledge markdown, evidence links, status reconcile, encoding checklist, owner CRUD, and Citron Volt UI.
+Phase 3 ships workflows (ordered skill chains), review gates, dry-run execution with JSON artifacts, Home digest, and Disconnected channel stubs — on top of the SQLite map, knowledge, and Citron Volt UI.
 
 ## Design
 
@@ -70,9 +70,19 @@ Open [http://localhost:3000](http://localhost:3000). Sign in as **macnet@matos.l
 
 Credentials provider only. Mutations require `OWNER_EMAIL` (default `macnet@matos.local`). No OAuth. See `docs/SECURITY.md`.
 
+## Phase 3 surfaces
+
+| Route | Purpose |
+|---|---|
+| `/workflows` | List / create skill chains |
+| `/workflows/[id]` | Edit chain, advance gate, dry-run |
+| `/workflows/runs/[runId]` | Run trace (logs + artifacts) |
+| `/home` | Pending gates + activity + last run |
+| `/settings/channels` | Late.dev / Etsy / WhatsApp stubs |
+
 ## Out of scope
 
-Live Etsy / social APIs, Stripe, deploy host, workflow engine.
+Live Etsy / Late.dev / WhatsApp Web / Stripe OAuth, deploy host.
 
 ## License
 
