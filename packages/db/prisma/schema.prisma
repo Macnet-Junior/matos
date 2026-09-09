@@ -218,3 +218,137 @@ model IntegrationCredential {
   @@unique([accountId, kind])
   @@index([accountId])
 }
+
+/// Phase 5 — who is online / recently active
+model UserPresence {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  role        String   @default("Viewer")
+  lastSeenAt  DateTime @default(now())
+  currentPath String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([lastSeenAt])
+}
+
+/// Metered resource pulls (AI credits, Late, Etsy, WhatsApp, API hits)
+model UsageEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  kind      String
+  units     Float    @default(1)
+  metaJson  String   @default("{}")
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([kind])
+  @@index([createdAt])
+}
+
+/// Credits grant / consume / adjust ledger (stub pricing — no Stripe)
+model CreditLedger {
+  id           String   @id @default(cuid())
+  userId       String
+  /// grant | consume | adjust
+  entryType    String
+  units        Float
+  balanceAfter Float
+  note         String   @default("")
+  actorEmail   String?
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+/// Approved auto-reply rules — cannot enable without Owner/Operator + approved gate
+model AutoResponseRule {
+  id             String   @id @default(cuid())
+  name           String
+  triggerKeyword String
+  /// whatsapp | late | support | email
+  channel        String   @default("support")
+  template       String
+  enabled        Boolean  @default(false)
+  /// pending | approved | rejected
+  reviewGate     String   @default("pending")
+  approvedBy     String?
+  approvedAt     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  attempts       AutoResponseAttempt[]
+
+  @@index([enabled])
+  @@index([channel])
+}
+
+model AutoResponseAttempt {
+  id         String   @id @default(cuid())
+  ruleId     String
+  rule       AutoResponseRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  /// attempted | blocked | sent_sim
+  status     String
+  detail     String   @default("")
+  actorEmail String?
+  createdAt  DateTime @default(now())
+
+  @@index([ruleId])
+  @@index([createdAt])
+}
+
+model SupportTicket {
+  id             String   @id @default(cuid())
+  subject        String
+  body           String
+  /// open | pending | solved
+  status         String   @default("open")
+  /// low | normal | high
+  priority       String   @default("normal")
+  requesterEmail String
+  assigneeEmail  String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  messages       SupportMessage[]
+
+  @@index([status])
+  @@index([requesterEmail])
+  @@index([createdAt])
+}
+
+model SupportMessage {
+  id          String        @id @default(cuid())
+  ticketId    String
+  ticket      SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorEmail String
+  body        String
+  /// comment | system
+  kind        String        @default("comment")
+  createdAt   DateTime      @default(now())
+
+  @@index([ticketId])
+}
+
+model ChatThread {
+  id        String        @id @default(cuid())
+  userEmail String
+  title     String        @default("Support chat")
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  messages  ChatMessage[]
+
+  @@index([userEmail])
+}
+
+model ChatMessage {
+  id        String     @id @default(cuid())
+  threadId  String
+  thread    ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  /// user | assistant | system
+  role      String
+  body      String
+  metaJson  String     @default("{}")
+  createdAt DateTime   @default(now())
+
+  @@index([threadId])
+}

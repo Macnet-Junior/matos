@@ -266,6 +266,7 @@ async function attemptChannelPublish(input: {
   gate: ContentGate;
   skillTitle: string;
   purpose: string;
+  actorEmail?: string | null;
 }): Promise<{
   logs: Array<{ level: string; message: string }>;
   artifact: Record<string, unknown>;
@@ -325,6 +326,15 @@ async function attemptChannelPublish(input: {
             artifact.externalPost = true;
             artifact.late = result;
             (artifact.channels as string[]).push("late-dev");
+            try {
+              const { recordUsageEvent } = await import("./ops/usage");
+              await recordUsageEvent({
+                userId: input.actorEmail ?? "workspace",
+                kind: "late_post",
+                units: 1,
+                meta: { skillSlug: input.skillSlug, simulated: false },
+              });
+            } catch { /* ignore meter errors */ }
           } else {
             const sim = simulateLateSchedule({
               content,
@@ -337,6 +347,15 @@ async function attemptChannelPublish(input: {
             });
             artifact.late = sim;
             (artifact.channels as string[]).push("late-dev:simulated");
+            try {
+              const { recordUsageEvent } = await import("./ops/usage");
+              await recordUsageEvent({
+                userId: input.actorEmail ?? "workspace",
+                kind: "late_post",
+                units: 1,
+                meta: { skillSlug: input.skillSlug, simulated: true },
+              });
+            } catch { /* ignore */ }
           }
         } catch (err) {
           const msg = err instanceof Error ? err.message : "Late API error";
@@ -347,6 +366,15 @@ async function attemptChannelPublish(input: {
           const sim = simulateLateSchedule({ content, reason: msg });
           artifact.late = sim;
           (artifact.channels as string[]).push("late-dev:simulated");
+            try {
+              const { recordUsageEvent } = await import("./ops/usage");
+              await recordUsageEvent({
+                userId: input.actorEmail ?? "workspace",
+                kind: "late_post",
+                units: 1,
+                meta: { skillSlug: input.skillSlug, simulated: true },
+              });
+            } catch { /* ignore */ }
         }
       } else {
         const sim = simulateLateSchedule({
@@ -360,6 +388,15 @@ async function attemptChannelPublish(input: {
         });
         artifact.late = sim;
         (artifact.channels as string[]).push("late-dev:simulated");
+            try {
+              const { recordUsageEvent } = await import("./ops/usage");
+              await recordUsageEvent({
+                userId: input.actorEmail ?? "workspace",
+                kind: "late_post",
+                units: 1,
+                meta: { skillSlug: input.skillSlug, simulated: true },
+              });
+            } catch { /* ignore */ }
       }
     } catch (err) {
       logs.push({
@@ -389,6 +426,15 @@ async function attemptChannelPublish(input: {
     (artifact.channels as string[]).push(
       result.simulated ? "etsy:simulated" : "etsy",
     );
+    try {
+      const { recordUsageEvent } = await import("./ops/usage");
+      await recordUsageEvent({
+        userId: input.actorEmail ?? "workspace",
+        kind: "etsy_call",
+        units: 1,
+        meta: { skillSlug: input.skillSlug, simulated: !!result.simulated },
+      });
+    } catch { /* ignore */ }
   }
 
   // WhatsApp — never send without allowlist + gate (simulate only in dry-run)
@@ -421,6 +467,17 @@ async function attemptChannelPublish(input: {
     (artifact.channels as string[]).push(
       result.ok ? "whatsapp:simulated" : "whatsapp:blocked",
     );
+    if (result.ok) {
+      try {
+        const { recordUsageEvent } = await import("./ops/usage");
+        await recordUsageEvent({
+          userId: input.actorEmail ?? "workspace",
+          kind: "whatsapp_send",
+          units: 1,
+          meta: { skillSlug: input.skillSlug, simulated: !!result.simulated },
+        });
+      } catch { /* ignore */ }
+    }
   }
 
   if (!(artifact.channels as string[]).length) {
@@ -531,6 +588,7 @@ export async function executeDryRun(input: {
         gate,
         skillTitle: step.skill.title,
         purpose: step.skill.purpose,
+        actorEmail: input.actorEmail,
       });
       for (const line of publishResult.logs) {
         logs.push({

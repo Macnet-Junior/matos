@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
 
 const workspace = [
   { href: "/home", label: "Home" },
@@ -19,6 +20,20 @@ const build = [
   { href: "/settings/channels", label: "Channels" },
 ];
 
+const ops = [
+  { href: "/ops", label: "Ops home" },
+  { href: "/ops/feed", label: "Feed" },
+  { href: "/ops/presence", label: "Presence" },
+  { href: "/ops/usage", label: "Usage" },
+  { href: "/ops/billing", label: "Billing" },
+  { href: "/ops/auto-response", label: "Auto-response" },
+];
+
+const support = [
+  { href: "/support", label: "Tickets" },
+  { href: "/support/chat", label: "Chatbot" },
+];
+
 const library = [
   { href: "/library", label: "Library" },
   { href: "/library/encoding-guide", label: "Encoding guide" },
@@ -26,7 +41,10 @@ const library = [
 
 function NavLink({ href, label }: { href: string; label: string }) {
   const pathname = usePathname();
-  const active = pathname === href || pathname.startsWith(`${href}/`);
+  const active =
+    href === "/ops"
+      ? pathname === "/ops"
+      : pathname === href || pathname.startsWith(`${href}/`);
   return (
     <Link
       href={href}
@@ -48,9 +66,34 @@ function NavLink({ href, label }: { href: string; label: string }) {
   );
 }
 
-export function Sidebar() {
+function Section({
+  title,
+  items,
+}: {
+  title: string;
+  items: { href: string; label: string }[];
+}) {
   return (
-    <aside className="flex h-full w-[232px] shrink-0 flex-col gap-5 border-r border-matos-soft bg-matos-elev px-3.5 py-[18px]">
+    <div>
+      <div className="px-2 pb-1.5 text-[10px] uppercase tracking-[0.08em] text-matos-muted2">
+        {title}
+      </div>
+      <nav className="flex flex-col gap-0.5">
+        {items.map((item) => (
+          <NavLink key={item.href} {...item} />
+        ))}
+      </nav>
+    </div>
+  );
+}
+
+export function Sidebar() {
+  const { data } = useSession();
+  const role = (data?.user as { role?: string } | undefined)?.role;
+  const canViewOps = role === "Owner" || role === "Operator";
+
+  return (
+    <aside className="flex h-full w-[232px] shrink-0 flex-col gap-5 overflow-y-auto border-r border-matos-soft bg-matos-elev px-3.5 py-[18px]">
       <div className="flex items-center gap-2.5 px-2 pb-3 pt-1">
         <div className="grid h-7 w-7 place-items-center rounded-[7px] bg-matos-citron text-[12px] font-extrabold tracking-tight text-[#0b0c0e]">
           M
@@ -63,38 +106,11 @@ export function Sidebar() {
         </div>
       </div>
 
-      <div>
-        <div className="px-2 pb-1.5 text-[10px] uppercase tracking-[0.08em] text-matos-muted2">
-          Workspace
-        </div>
-        <nav className="flex flex-col gap-0.5">
-          {workspace.map((item) => (
-            <NavLink key={item.href} {...item} />
-          ))}
-        </nav>
-      </div>
-
-      <div>
-        <div className="px-2 pb-1.5 text-[10px] uppercase tracking-[0.08em] text-matos-muted2">
-          Build &amp; Operate
-        </div>
-        <nav className="flex flex-col gap-0.5">
-          {build.map((item) => (
-            <NavLink key={item.href} {...item} />
-          ))}
-        </nav>
-      </div>
-
-      <div>
-        <div className="px-2 pb-1.5 text-[10px] uppercase tracking-[0.08em] text-matos-muted2">
-          Library
-        </div>
-        <nav className="flex flex-col gap-0.5">
-          {library.map((item) => (
-            <NavLink key={item.href} {...item} />
-          ))}
-        </nav>
-      </div>
+      <Section title="Workspace" items={workspace} />
+      <Section title="Build & Operate" items={build} />
+      {canViewOps ? <Section title="Ops" items={ops} /> : null}
+      <Section title="Support" items={support} />
+      <Section title="Library" items={library} />
 
       <div className="mt-auto p-2">
         <div className="rounded-[10px] border border-matos-border bg-matos-panel p-3">

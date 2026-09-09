@@ -2,7 +2,7 @@
 
 **MatOS** is a company operating layer: a precision dark workspace where your agency is modeled as a living map of departments and authored skills.
 
-Phase 4b ships Late.dev/Zernio, Etsy OAuth, and WhatsApp Cloud **adapter scaffolding** + Channels Connect UI (encrypted credentials, mocked paths without keys). Phase 4 hardening (RBAC, backups, export) remains. **Stripe / host deploy still deferred.**
+Phase 5 ships **Ops & Support**: live feed, presence heartbeats, usage meters, stub credits/billing, gated auto-response, tickets, and FAQ chatbot. Phase 4b connectors + Phase 4 RBAC remain. **Stripe live charges / host deploy still deferred.**
 
 ## Design
 
@@ -78,6 +78,13 @@ pnpm --filter @matos/db studio
 ```
 
 `OWNER_EMAIL` always resolves as Owner even if the DB row differs. See `docs/LAUNCH.md` and `apps/web/src/lib/rbac.ts`.
+
+### Ops & Support (Phase 5)
+
+- `/ops/*` — Owner/Operator meters (feed, presence, usage, billing, auto-response)
+- `/support` + `/support/chat` — tickets + FAQ chatbot for all roles
+- Heartbeat: shell POSTs `/api/ops/presence` every ~30s
+
 
 ## Scripts
 

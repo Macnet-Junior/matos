@@ -8,11 +8,15 @@ export type Permission =
   | "workflow:manage"
   | "workflow:run"
   | "workflow:approve"
-  | "activity:export";
+  | "activity:export"
+  | "ops:view"
+  | "ops:manage"
+  | "support:use"
+  | "support:ops";
 
 export const ROLES: Role[] = ["Owner", "Operator", "Author", "Viewer"];
 
-/** Role → permissions matrix (Phase 4 hardening). */
+/** Role → permissions matrix (Phase 4 + Phase 5 ops/support). */
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   Owner: [
     "map:manage",
@@ -21,10 +25,20 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "workflow:run",
     "workflow:approve",
     "activity:export",
+    "ops:view",
+    "ops:manage",
+    "support:use",
+    "support:ops",
   ],
-  Operator: ["workflow:run", "workflow:approve"],
-  Author: ["skill:edit"],
-  Viewer: [],
+  Operator: [
+    "workflow:run",
+    "workflow:approve",
+    "ops:view",
+    "support:use",
+    "support:ops",
+  ],
+  Author: ["skill:edit", "support:use"],
+  Viewer: ["support:use"],
 };
 
 export function ownerEmail(): string {
@@ -50,6 +64,10 @@ export type Capabilities = {
   canRunWorkflows: boolean;
   canApprove: boolean;
   canExportActivity: boolean;
+  canViewOps: boolean;
+  canManageOps: boolean;
+  canUseSupport: boolean;
+  canOpsSupport: boolean;
 };
 
 export function capabilitiesFor(role: Role): Capabilities {
@@ -60,6 +78,10 @@ export function capabilitiesFor(role: Role): Capabilities {
     canRunWorkflows: hasPermission(role, "workflow:run"),
     canApprove: hasPermission(role, "workflow:approve"),
     canExportActivity: hasPermission(role, "activity:export"),
+    canViewOps: hasPermission(role, "ops:view"),
+    canManageOps: hasPermission(role, "ops:manage"),
+    canUseSupport: hasPermission(role, "support:use"),
+    canOpsSupport: hasPermission(role, "support:ops"),
   };
 }
 

@@ -561,18 +561,166 @@ async function main() {
     });
   }
 
+  // --- Phase 5 ops & support sample data ---
+  await prisma.autoResponseAttempt.deleteMany();
+  await prisma.autoResponseRule.deleteMany();
+  await prisma.chatMessage.deleteMany();
+  await prisma.chatThread.deleteMany();
+  await prisma.supportMessage.deleteMany();
+  await prisma.supportTicket.deleteMany();
+  await prisma.usageEvent.deleteMany();
+  await prisma.creditLedger.deleteMany();
+  await prisma.userPresence.deleteMany();
+
+  await prisma.creditLedger.create({
+    data: {
+      id: "credit-seed-grant",
+      userId: "workspace",
+      entryType: "grant",
+      units: 1000,
+      balanceAfter: 1000,
+      note: "Phase 5 seed credit grant",
+      actorEmail: "system@matos.local",
+    },
+  });
+
+  const usageSeeds: { userId: string; kind: string; units: number }[] = [
+    { userId: "macnet@matos.local", kind: "ai_credit", units: 12 },
+    { userId: "macnet@matos.local", kind: "late_post", units: 3 },
+    { userId: "operator@matos.local", kind: "etsy_call", units: 5 },
+    { userId: "operator@matos.local", kind: "whatsapp_send", units: 1 },
+    { userId: "author@matos.local", kind: "api_hit", units: 40 },
+    { userId: "viewer@matos.local", kind: "api_hit", units: 8 },
+  ];
+  for (const u of usageSeeds) {
+    await prisma.usageEvent.create({
+      data: {
+        userId: u.userId,
+        kind: u.kind,
+        units: u.units,
+        metaJson: JSON.stringify({ seed: true }),
+      },
+    });
+  }
+
+  await prisma.creditLedger.create({
+    data: {
+      userId: "workspace",
+      entryType: "consume",
+      units: -25,
+      balanceAfter: 975,
+      note: "Seed consumption (AI + Late stub)",
+      actorEmail: "system@matos.local",
+    },
+  });
+
+  const approvedRule = await prisma.autoResponseRule.create({
+    data: {
+      id: "ar-hours",
+      name: "Office hours reply",
+      triggerKeyword: "hours",
+      channel: "support",
+      template:
+        "Thanks for writing — MatOS support hours are weekdays 9–5 ET. An Owner will follow up on tickets.",
+      enabled: true,
+      reviewGate: "approved",
+      approvedBy: "macnet@matos.local",
+      approvedAt: new Date(),
+    },
+  });
+  await prisma.autoResponseRule.create({
+    data: {
+      id: "ar-pending",
+      name: "Welcome (pending gate)",
+      triggerKeyword: "hello",
+      channel: "whatsapp",
+      template: "Welcome — this rule stays disabled until approved.",
+      enabled: false,
+      reviewGate: "pending",
+    },
+  });
+  await prisma.autoResponseAttempt.create({
+    data: {
+      ruleId: approvedRule.id,
+      status: "sent_sim",
+      detail: "Seed simulated auto-reply",
+      actorEmail: "system@matos.local",
+    },
+  });
+
+  const ticket = await prisma.supportTicket.create({
+    data: {
+      id: "ticket-seed-1",
+      subject: "How do I connect Late.dev?",
+      body: "I want to schedule posts but Channels shows Disconnected.",
+      status: "open",
+      priority: "normal",
+      requesterEmail: "viewer@matos.local",
+      assigneeEmail: "operator@matos.local",
+      messages: {
+        create: {
+          authorEmail: "viewer@matos.local",
+          body: "I want to schedule posts but Channels shows Disconnected.",
+          kind: "comment",
+        },
+      },
+    },
+  });
+
+  const thread = await prisma.chatThread.create({
+    data: {
+      id: "chat-seed-1",
+      userEmail: "viewer@matos.local",
+      title: "FAQ help",
+      messages: {
+        create: [
+          {
+            role: "user",
+            body: "How do credits work?",
+            metaJson: "{}",
+          },
+          {
+            role: "assistant",
+            body: "Credits are stub meters — Stripe is not live. See knowledge/support/billing-credits.md.",
+            metaJson: JSON.stringify({ kind: "answer", usedLlm: false }),
+          },
+        ],
+      },
+    },
+  });
+
+  await prisma.userPresence.createMany({
+    data: [
+      {
+        email: "macnet@matos.local",
+        role: "Owner",
+        lastSeenAt: new Date(),
+        currentPath: "/ops/feed",
+      },
+      {
+        email: "operator@matos.local",
+        role: "Operator",
+        lastSeenAt: new Date(Date.now() - 60_000),
+        currentPath: "/workflows",
+      },
+    ],
+  });
+
   await prisma.activityEvent.create({
     data: {
       action: "seed",
       entityType: "company",
       entityId: company.id,
       summary:
-        "Seeded MatOS Agency with 7 departments, skills, workflows, and RBAC roles",
+        "Seeded MatOS Agency with map, workflows, RBAC, integrations stubs, and Phase 5 ops/support",
       actorEmail: "system@matos.local",
       payloadJson: JSON.stringify({
-        phase: 4,
+        phase: 5,
         workflows: [researchToCalendar.slug, hookToScript.slug],
         roles: roleSeeds.map((r) => r.email),
+        ticketId: ticket.id,
+        chatThreadId: thread.id,
+        autoResponse: approvedRule.id,
       }),
     },
   });
@@ -584,6 +732,9 @@ async function main() {
     workflows: await prisma.workflow.count(),
     workflowSteps: await prisma.workflowStep.count(),
     roles: await prisma.userRole.count(),
+    usageEvents: await prisma.usageEvent.count(),
+    tickets: await prisma.supportTicket.count(),
+    autoRules: await prisma.autoResponseRule.count(),
   };
   console.log("Seed complete:", counts);
 }

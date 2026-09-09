@@ -1,5 +1,6 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import { resolveRole } from "@/lib/rbac";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
@@ -18,10 +19,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
         const name =
           email === "macnet@matos.local" ? "Macnet Junior" : email.split("@")[0];
+        const role = await resolveRole(email);
         return {
           id: email,
           email,
           name,
+          role,
         };
       },
     }),
@@ -36,6 +39,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         token.name = user.name;
         token.email = user.email;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        token.role = (user as any).role ?? "Viewer";
+      } else if (typeof token.email === "string" && !token.role) {
+        token.role = await resolveRole(token.email);
       }
       return token;
     },
@@ -47,6 +54,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (typeof token.email === "string") {
           session.user.email = token.email;
         }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (session.user as any).role = (token.role as string) ?? "Viewer";
       }
       return session;
     },

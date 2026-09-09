@@ -37,10 +37,10 @@ Login: `macnet@matos.local` / `dev` (Owner). Other seeded emails (password `dev`
 
 | Role | Capabilities |
 |---|---|
-| Owner | Full CRUD, run, approve, activity export |
-| Operator | Run workflows + advance review gates |
-| Author | Edit / create skills |
-| Viewer | Read-only |
+| Owner | Full CRUD, run, approve, export, ops manage, support ops |
+| Operator | Run + approve, ops view, support ops |
+| Author | Edit skills + support tickets/chat |
+| Viewer | Read + support tickets/chat |
 
 Assign roles: upsert rows in `UserRole` (see README) or keep `OWNER_EMAIL`.
 
@@ -48,14 +48,30 @@ Assign roles: upsert rows in `UserRole` (see README) or keep `OWNER_EMAIL`.
 
 Without keys: Connect UI + mocked/simulated publish paths work. With keys: Late schedule, Etsy OAuth, WhatsApp allowlisted send (gate required).
 
+## Phase 5 — Ops & Support
+
+| Surface | Path | Who |
+|---|---|---|
+| Ops home / presence count | `/ops` | Owner, Operator |
+| Live feed | `/ops/feed` | Owner, Operator |
+| Presence | `/ops/presence` | Owner, Operator |
+| Usage meters | `/ops/usage` | Owner, Operator |
+| Credits / billing stub | `/ops/billing` | Owner (grant), Operator (view) |
+| Auto-response desk | `/ops/auto-response` | Owner, Operator |
+| Support tickets | `/support` | All roles |
+| Support chatbot | `/support/chat` | All roles |
+
+Demo: login Owner → open Feed (filter Usage) → Presence (see heartbeat) → Usage charts → Billing grant → Auto-response (try enable pending rule — blocked) → Support ticket + chat “refund” (escalates).
+
 ## Deferred — do not block local launch
 
 - [ ] Host / Vercel (or other) deploy
-- [ ] Stripe
+- [ ] Stripe live charges (Ops labels “Stripe connect — Phase 4b later”)
 - [ ] Replace credentials provider for production auth
 - [x] Late.dev / Zernio adapter + Connect UI (scaffolding)
 - [x] Etsy OAuth scaffolding
 - [x] WhatsApp allowlisted send scaffolding
+- [x] Phase 5 Ops & Support surfaces
 
 ## Pre-flight
 

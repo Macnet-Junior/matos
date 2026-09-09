@@ -7,6 +7,7 @@ import {
   whatsappConfigFromEnv,
 } from "@/lib/integrations/whatsapp";
 import { appendActivity } from "@/lib/map-data";
+import { recordUsageEvent } from "@/lib/ops/usage";
 
 export const dynamic = "force-dynamic";
 
@@ -62,6 +63,15 @@ export async function POST(req: Request) {
       actorEmail: gate.email,
       payload: { simulated: true, ok: result.ok },
     });
+    if (result.ok) {
+      await recordUsageEvent({
+        userId: gate.email,
+        kind: "whatsapp_send",
+        units: 1,
+        meta: { simulated: true, route: "api" },
+        activity: false,
+      });
+    }
     return NextResponse.json({ result });
   }
 
@@ -85,5 +95,14 @@ export async function POST(req: Request) {
     actorEmail: gate.email,
     payload: { simulated: false, ok: result.ok, messageId: result.messageId },
   });
+  if (result.ok) {
+    await recordUsageEvent({
+      userId: gate.email,
+      kind: "whatsapp_send",
+      units: 1,
+      meta: { simulated: false, route: "api" },
+      activity: false,
+    });
+  }
   return NextResponse.json({ result }, { status: result.ok ? 200 : 400 });
 }

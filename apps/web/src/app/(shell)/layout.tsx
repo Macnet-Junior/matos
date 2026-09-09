@@ -1,4 +1,5 @@
 import { Sidebar } from "@/components/Sidebar";
+import { PresenceHeartbeat } from "@/components/PresenceHeartbeat";
 
 export default function ShellLayout({
   children,
@@ -8,7 +9,10 @@ export default function ShellLayout({
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
-      <div className="flex min-w-0 flex-1 flex-col">{children}</div>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <PresenceHeartbeat />
+        {children}
+      </div>
     </div>
   );
 }

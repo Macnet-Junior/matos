@@ -131,3 +131,48 @@ export async function requireActivityExport() {
     rateLimit: 10,
   });
 }
+
+export async function requireOpsView() {
+  return requirePermission("ops:view", {
+    rateKey: "ops-view",
+    rateLimit: 120,
+  });
+}
+
+export async function requireOpsManage() {
+  return requirePermission("ops:manage", {
+    rateKey: "ops-manage",
+    rateLimit: 40,
+  });
+}
+
+export async function requireSupportUse() {
+  return requirePermission("support:use", {
+    rateKey: "support-use",
+    rateLimit: 60,
+  });
+}
+
+export async function requireSupportOps() {
+  return requirePermission("support:ops", {
+    rateKey: "support-ops",
+    rateLimit: 60,
+  });
+}
+
+/** Any authenticated session (for presence heartbeat). */
+export async function requireSession() {
+  const session = await auth();
+  if (!session?.user?.email) {
+    return { ok: false as const, status: 401 as const, error: "Unauthorized" };
+  }
+  const email = session.user.email.trim().toLowerCase();
+  const role = await resolveRole(email);
+  return {
+    ok: true as const,
+    email,
+    name: session.user.name ?? email,
+    role,
+    ...capabilitiesFor(role),
+  };
+}
