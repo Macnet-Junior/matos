@@ -62,3 +62,11 @@ export function previousStage(stage: DeskStage): DeskStage | null {
   if (i <= 0) return null;
   return DESK_STAGES[i - 1]!;
 }
+
+/** Seed/JSON sometimes stores the two-char sequence \n instead of a real newline. */
+export function normalizeDeskBody(body: string): string {
+  if (!body) return body;
+  if (body.includes("\n")) return body;
+  if (!body.includes("\\n")) return body;
+  return body.replace(/\\n/g, "\n").replace(/\\t/g, "\t");
+}

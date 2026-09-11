@@ -4,12 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Badge, Button } from "@matos/ui";
-import {
-  DESK_STAGES,
-  STAGE_LABELS,
-  type DeskJobDTO,
-  type DeskStage,
-} from "@/lib/desk";
+import { DESK_STAGES, STAGE_LABELS, type DeskStage } from "@/lib/desk/stages";
+import type { DeskJobDTO } from "@/lib/desk";
 
 export function DeskJobDetail({
   job: initial,

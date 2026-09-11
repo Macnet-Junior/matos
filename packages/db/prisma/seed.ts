@@ -734,8 +734,12 @@ async function main() {
             id: "desk-art-scout-1",
             stage: "scout",
             title: "Scout notes",
-            body:
-              "## Research notes\\n\\n- Solo operators spend 6–10h/week on tooling glue.\\n- Pain: briefs never become scheduled packs.\\n- Angle: Desk as a newsroom with human gates.\\n- Sources: internal brand voice + offer ladder.",
+            body: `## Research notes
+
+- Solo operators spend 6–10h/week on tooling glue.
+- Pain: briefs never become scheduled packs.
+- Angle: Desk as a newsroom with human gates.
+- Sources: internal brand voice + offer ladder.`,
             reviewState: "approved",
             reviewedBy: "operator@matos.local",
             reviewedAt: new Date(),
@@ -744,8 +748,13 @@ async function main() {
             id: "desk-art-ghost-1",
             stage: "ghost",
             title: "Ghost draft",
-            body:
-              "## Draft\\n\\nHook: Your content calendar is a graveyard of almost-ships.\\n\\nBody: MatOS Desk runs Scout → Ghost → Editor → Press → Clock → Echo with an approve gate at every stage.\\n\\nCTA: Open Desk and file your first brief.",
+            body: `## Draft
+
+Hook: Your content calendar is a graveyard of almost-ships.
+
+Body: MatOS Desk runs Scout → Ghost → Editor → Press → Clock → Echo with an approve gate at every stage.
+
+CTA: Open Desk and file your first brief.`,
             reviewState: "ready",
           },
         ],
