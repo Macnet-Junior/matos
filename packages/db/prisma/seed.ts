@@ -706,16 +706,88 @@ async function main() {
     ],
   });
 
+
+  // --- Phase 5.5 Relay Desk sample jobs ---
+  await prisma.deskInboxItem.deleteMany();
+  await prisma.deskCalendarItem.deleteMany();
+  await prisma.deskStageArtifact.deleteMany();
+  await prisma.deskJob.deleteMany();
+
+  const dueSoon = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+  const dueLater = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+  const deskJob1 = await prisma.deskJob.create({
+    data: {
+      id: "desk-job-seed-1",
+      title: "ICP pain → offer ladder post",
+      topic: "Why solo operators drown in content ops",
+      audience: "Founder-operators building a one-person media company",
+      offerCta: "Book a MatOS walkthrough / start with the Company Map",
+      channelsJson: JSON.stringify(["x", "linkedin", "newsletter"]),
+      dueAt: dueSoon,
+      stage: "ghost",
+      status: "awaiting_approval",
+      createdBy: "author@matos.local",
+      artifacts: {
+        create: [
+          {
+            id: "desk-art-scout-1",
+            stage: "scout",
+            title: "Scout notes",
+            body: `## Research notes
+
+- Solo operators spend 6–10h/week on tooling glue.
+- Pain: briefs never become scheduled packs.
+- Angle: Desk as a newsroom with human gates.
+- Sources: internal brand voice + offer ladder.`,
+            reviewState: "approved",
+            reviewedBy: "operator@matos.local",
+            reviewedAt: new Date(),
+          },
+          {
+            id: "desk-art-ghost-1",
+            stage: "ghost",
+            title: "Ghost draft",
+            body: `## Draft
+
+Hook: Your content calendar is a graveyard of almost-ships.
+
+Body: MatOS Desk runs Scout → Ghost → Editor → Press → Clock → Echo with an approve gate at every stage.
+
+CTA: Open Desk and file your first brief.`,
+            reviewState: "ready",
+          },
+        ],
+      },
+    },
+  });
+
+  const deskJob2 = await prisma.deskJob.create({
+    data: {
+      id: "desk-job-seed-2",
+      title: "Warm review ritual explainer",
+      topic: "Warm review beats spray-and-pray publishing",
+      audience: "Operators who approve content before it ships",
+      offerCta: "Use Warm gate on Workflows + Desk Press packs",
+      channelsJson: JSON.stringify(["linkedin", "blog"]),
+      dueAt: dueLater,
+      stage: "scout",
+      status: "draft",
+      createdBy: "macnet@matos.local",
+    },
+  });
+
+
   await prisma.activityEvent.create({
     data: {
       action: "seed",
       entityType: "company",
       entityId: company.id,
       summary:
-        "Seeded MatOS Agency with map, workflows, RBAC, integrations stubs, and Phase 5 ops/support",
+        "Seeded MatOS Agency with map, workflows, RBAC, integrations stubs, Phase 5 ops/support, and Phase 5.5 Desk",
       actorEmail: "system@matos.local",
       payloadJson: JSON.stringify({
-        phase: 5,
+        phase: 5.5,
         workflows: [researchToCalendar.slug, hookToScript.slug],
         roles: roleSeeds.map((r) => r.email),
         ticketId: ticket.id,
@@ -735,6 +807,7 @@ async function main() {
     usageEvents: await prisma.usageEvent.count(),
     tickets: await prisma.supportTicket.count(),
     autoRules: await prisma.autoResponseRule.count(),
+    deskJobs: await prisma.deskJob.count(),
   };
   console.log("Seed complete:", counts);
 }

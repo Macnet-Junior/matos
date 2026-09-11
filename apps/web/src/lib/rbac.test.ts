@@ -35,6 +35,8 @@ describe("RBAC matrix", () => {
       "ops:manage",
       "support:use",
       "support:ops",
+      "desk:run",
+      "desk:approve",
     ];
     for (const p of expected) {
       expect(perms).toContain(p);
@@ -49,12 +51,16 @@ describe("RBAC matrix", () => {
     expect(caps.canExportActivity).toBe(true);
     expect(caps.canViewOps).toBe(true);
     expect(caps.canManageOps).toBe(true);
+    expect(caps.canRunDesk).toBe(true);
+    expect(caps.canApproveDesk).toBe(true);
   });
 
   it("Operator can run, approve, and view ops", () => {
     expect(hasPermission("Operator", "workflow:run")).toBe(true);
     expect(hasPermission("Operator", "workflow:approve")).toBe(true);
     expect(hasPermission("Operator", "ops:view")).toBe(true);
+    expect(hasPermission("Operator", "desk:run")).toBe(true);
+    expect(hasPermission("Operator", "desk:approve")).toBe(true);
     expect(hasPermission("Operator", "skill:edit")).toBe(false);
     expect(hasPermission("Operator", "map:manage")).toBe(false);
     expect(hasPermission("Operator", "workflow:manage")).toBe(false);
@@ -65,16 +71,22 @@ describe("RBAC matrix", () => {
     expect(caps.canApprove).toBe(true);
     expect(caps.canViewOps).toBe(true);
     expect(caps.canEditSkills).toBe(false);
+    expect(caps.canRunDesk).toBe(true);
+    expect(caps.canApproveDesk).toBe(true);
   });
 
-  it("Author can edit skills + use support", () => {
+  it("Author can edit skills, use support, and run Desk", () => {
     expect(hasPermission("Author", "skill:edit")).toBe(true);
     expect(hasPermission("Author", "support:use")).toBe(true);
+    expect(hasPermission("Author", "desk:run")).toBe(true);
+    expect(hasPermission("Author", "desk:approve")).toBe(false);
     expect(hasPermission("Author", "workflow:run")).toBe(false);
     expect(hasPermission("Author", "map:manage")).toBe(false);
     expect(hasPermission("Author", "ops:view")).toBe(false);
     expect(capabilitiesFor("Author").canEditSkills).toBe(true);
     expect(capabilitiesFor("Author").canManageMap).toBe(false);
+    expect(capabilitiesFor("Author").canRunDesk).toBe(true);
+    expect(capabilitiesFor("Author").canApproveDesk).toBe(false);
   });
 
   it("Viewer is read-only except support", () => {
@@ -83,6 +95,8 @@ describe("RBAC matrix", () => {
     expect(caps.canUseSupport).toBe(true);
     expect(caps.canManageMap).toBe(false);
     expect(caps.canViewOps).toBe(false);
+    expect(caps.canRunDesk).toBe(false);
+    expect(caps.canApproveDesk).toBe(false);
   });
 
   it("matrix covers every role key", () => {

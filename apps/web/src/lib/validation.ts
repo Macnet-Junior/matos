@@ -141,3 +141,36 @@ export const updateWorkflowSchema = z.object({
 export const advanceGateSchema = z.object({
   to: contentGateSchema,
 });
+
+
+export const deskChannelSchema = z.enum([
+  "x",
+  "linkedin",
+  "newsletter",
+  "blog",
+  "instagram",
+  "youtube",
+]);
+
+export const createDeskBriefSchema = z.object({
+  title: z.string().trim().min(2).max(120).optional(),
+  topic: z.string().trim().min(2).max(240),
+  audience: z.string().trim().min(2).max(240),
+  offerCta: z.string().trim().min(2).max(240),
+  channels: z.array(deskChannelSchema).min(1).max(6),
+  dueAt: z.string().datetime().optional().nullable(),
+});
+
+export const updateDeskArtifactSchema = z.object({
+  body: z.string().max(40000),
+  title: z.string().trim().min(1).max(160).optional(),
+});
+
+export const deskReviewSchema = z.object({
+  action: z.enum(["approve", "request_changes"]),
+  note: z.string().trim().max(2000).optional(),
+});
+
+export const deskInboxActionSchema = z.object({
+  action: z.enum(["approve", "copied"]),
+});

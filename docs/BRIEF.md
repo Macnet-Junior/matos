@@ -2,7 +2,7 @@
 
 **Product:** MatOS  
 **Owner:** Macnet Junior  
-**Phase:** 5 — Ops & Support  
+**Phase:** 5.5 — Relay Desk  
 **Accent:** Citron Volt `#D6F31F` (hover `#E8FF5A`, pressed `#B8D110`)
 
 ## Intent
@@ -31,6 +31,12 @@ Next.js shell, Auth.js, React Flow map, Prisma SQLite, knowledge, workflows, RBA
 ### Data
 
 Prisma: `UserPresence`, `UsageEvent`, `CreditLedger`, `AutoResponseRule`, `AutoResponseAttempt`, `SupportTicket`, `SupportMessage`, `ChatThread`, `ChatMessage`.
+
+
+## Phase 5.5 — Relay Desk (in progress / shipped on branch)
+
+Newsroom mode inside the web app: `/desk`, `/calendar`, `/inbox`, Library desk archive.
+Six gated stages (Scout→Echo), placeholder LLM, no live publish. See `docs/DESK.md`.
 
 ### Still deferred
 
