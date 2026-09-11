@@ -176,3 +176,17 @@ export async function requireSession() {
     ...capabilitiesFor(role),
   };
 }
+
+export async function requireDeskRun() {
+  return requirePermission("desk:run", {
+    rateKey: "desk-run",
+    rateLimit: 40,
+  });
+}
+
+export async function requireDeskApprove() {
+  return requirePermission("desk:approve", {
+    rateKey: "desk-approve",
+    rateLimit: 40,
+  });
+}

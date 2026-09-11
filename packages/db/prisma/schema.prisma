@@ -352,3 +352,89 @@ model ChatMessage {
 
   @@index([threadId])
 }
+
+/// Phase 5.5 — Relay Desk content job (newsroom pipeline)
+model DeskJob {
+  id           String   @id @default(cuid())
+  title        String
+  topic        String
+  audience     String   @default("")
+  offerCta     String   @default("")
+  /// JSON string array of channel names
+  channelsJson String   @default("[]")
+  dueAt        DateTime?
+  /// scout | ghost | editor | press | clock | echo | filed
+  stage        String   @default("scout")
+  /// draft | generating | awaiting_approval | changes_requested | approved | filed
+  status       String   @default("draft")
+  createdBy    String
+  filedAt      DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  artifacts    DeskStageArtifact[]
+  calendarItems DeskCalendarItem[]
+  inboxItems   DeskInboxItem[]
+
+  @@index([stage])
+  @@index([status])
+  @@index([createdAt])
+  @@index([filedAt])
+}
+
+model DeskStageArtifact {
+  id          String   @id @default(cuid())
+  jobId       String
+  job         DeskJob  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  /// scout | ghost | editor | press | clock | echo
+  stage       String
+  title       String
+  body        String   @default("")
+  /// pending | ready | approved | changes_requested
+  reviewState String   @default("pending")
+  reviewedBy  String?
+  reviewedAt  DateTime?
+  reviewNote  String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([jobId, stage])
+  @@index([jobId])
+  @@index([stage])
+}
+
+model DeskCalendarItem {
+  id          String   @id @default(cuid())
+  jobId       String
+  job         DeskJob  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  channel     String
+  title       String
+  body        String   @default("")
+  scheduledAt DateTime
+  /// planned | ready — no live publish in Phase 5.5
+  status      String   @default("planned")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([jobId])
+  @@index([scheduledAt])
+}
+
+model DeskInboxItem {
+  id         String   @id @default(cuid())
+  jobId      String
+  job        DeskJob  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  channel    String
+  subject    String
+  body       String   @default("")
+  /// drafted | approved | copied — sending stays gated (no live network send)
+  status     String   @default("drafted")
+  approvedBy String?
+  approvedAt DateTime?
+  copiedAt   DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([jobId])
+  @@index([status])
+  @@index([createdAt])
+}

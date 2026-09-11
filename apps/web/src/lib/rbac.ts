@@ -12,7 +12,9 @@ export type Permission =
   | "ops:view"
   | "ops:manage"
   | "support:use"
-  | "support:ops";
+  | "support:ops"
+  | "desk:run"
+  | "desk:approve";
 
 export const ROLES: Role[] = ["Owner", "Operator", "Author", "Viewer"];
 
@@ -29,6 +31,8 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "ops:manage",
     "support:use",
     "support:ops",
+    "desk:run",
+    "desk:approve",
   ],
   Operator: [
     "workflow:run",
@@ -36,8 +40,10 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "ops:view",
     "support:use",
     "support:ops",
+    "desk:run",
+    "desk:approve",
   ],
-  Author: ["skill:edit", "support:use"],
+  Author: ["skill:edit", "support:use", "desk:run"],
   Viewer: ["support:use"],
 };
 
@@ -68,6 +74,8 @@ export type Capabilities = {
   canManageOps: boolean;
   canUseSupport: boolean;
   canOpsSupport: boolean;
+  canRunDesk: boolean;
+  canApproveDesk: boolean;
 };
 
 export function capabilitiesFor(role: Role): Capabilities {
@@ -82,6 +90,8 @@ export function capabilitiesFor(role: Role): Capabilities {
     canManageOps: hasPermission(role, "ops:manage"),
     canUseSupport: hasPermission(role, "support:use"),
     canOpsSupport: hasPermission(role, "support:ops"),
+    canRunDesk: hasPermission(role, "desk:run"),
+    canApproveDesk: hasPermission(role, "desk:approve"),
   };
 }
 

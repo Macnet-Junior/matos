@@ -34,9 +34,16 @@ const support = [
   { href: "/support/chat", label: "Chatbot" },
 ];
 
+const desk = [
+  { href: "/desk", label: "Desk" },
+  { href: "/calendar", label: "Calendar" },
+  { href: "/inbox", label: "Inbox" },
+];
+
 const library = [
   { href: "/library", label: "Library" },
   { href: "/library/encoding-guide", label: "Encoding guide" },
+  { href: "/library/desk", label: "Desk archive" },
 ];
 
 function NavLink({ href, label }: { href: string; label: string }) {
@@ -108,6 +115,7 @@ export function Sidebar() {
 
       <Section title="Workspace" items={workspace} />
       <Section title="Build & Operate" items={build} />
+      <Section title="Desk" items={desk} />
       {canViewOps ? <Section title="Ops" items={ops} /> : null}
       <Section title="Support" items={support} />
       <Section title="Library" items={library} />

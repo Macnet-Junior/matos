@@ -2,7 +2,7 @@
 
 **MatOS** is a company operating layer: a precision dark workspace where your agency is modeled as a living map of departments and authored skills.
 
-Phase 5 ships **Ops & Support**: live feed, presence heartbeats, usage meters, stub credits/billing, gated auto-response, tickets, and FAQ chatbot. Phase 4b connectors + Phase 4 RBAC remain. **Stripe live charges / host deploy still deferred.**
+Phase 5 ships **Ops & Support**: live feed, presence heartbeats, usage meters, stub credits/billing, gated auto-response, tickets, and FAQ chatbot. Phase **5.5** adds **Relay Desk** (newsroom pipeline: `/desk`, `/calendar`, `/inbox`) — see `docs/DESK.md`. Phase 4b connectors + Phase 4 RBAC remain. **Live channel publish / Stripe charges / host deploy still deferred.**
 
 ## Design
 
@@ -78,6 +78,10 @@ pnpm --filter @matos/db studio
 ```
 
 `OWNER_EMAIL` always resolves as Owner even if the DB row differs. See `docs/LAUNCH.md` and `apps/web/src/lib/rbac.ts`.
+
+### Relay Desk (Phase 5.5)
+
+Sidebar **Desk** → Desk / Calendar / Inbox. Six gated stages (Scout→Echo), Library desk archive. Placeholder LLM without `OPENAI_API_KEY`. **No live publish.** Details: [`docs/DESK.md`](docs/DESK.md).
 
 ### Ops & Support (Phase 5)
 

@@ -28,6 +28,10 @@ export type {
   UserRole,
   IntegrationAccount,
   IntegrationCredential,
+  DeskJob,
+  DeskStageArtifact,
+  DeskCalendarItem,
+  DeskInboxItem,
 } from "@prisma/client";
 
 export function parseJsonArray(raw: string): string[] {
