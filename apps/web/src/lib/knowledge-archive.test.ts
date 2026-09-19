@@ -6,8 +6,49 @@ import JSZip from "jszip";
 import {
   applyKnowledgeZip,
   buildKnowledgeZip,
+  listRawZipEntryNames,
   normalizeKnowledgeZipEntry,
 } from "./knowledge-archive";
+
+function crc32(data: Buffer): number {
+  let c = 0xffffffff;
+  for (const b of data) {
+    c ^= b;
+    for (let i = 0; i < 8; i += 1) {
+      c = (c >>> 1) ^ (c & 1 ? 0xedb88320 : 0);
+    }
+  }
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+/** STORE zip that keeps the filename bytes as-is (JSZip would normalize `..`). */
+function storeZip(name: string, content: string): Buffer {
+  const nameBuf = Buffer.from(name, "utf8");
+  const data = Buffer.from(content, "utf8");
+  const crcVal = crc32(data);
+  const local = Buffer.alloc(30);
+  local.writeUInt32LE(0x04034b50, 0);
+  local.writeUInt16LE(20, 4);
+  local.writeUInt32LE(crcVal, 14);
+  local.writeUInt32LE(data.length, 18);
+  local.writeUInt32LE(data.length, 22);
+  local.writeUInt16LE(nameBuf.length, 26);
+  const central = Buffer.alloc(46);
+  central.writeUInt32LE(0x02014b50, 0);
+  central.writeUInt16LE(20, 4);
+  central.writeUInt16LE(20, 6);
+  central.writeUInt32LE(crcVal, 16);
+  central.writeUInt32LE(data.length, 20);
+  central.writeUInt32LE(data.length, 24);
+  central.writeUInt16LE(nameBuf.length, 28);
+  const eocd = Buffer.alloc(22);
+  eocd.writeUInt32LE(0x06054b50, 0);
+  eocd.writeUInt16LE(1, 8);
+  eocd.writeUInt16LE(1, 10);
+  eocd.writeUInt32LE(46 + nameBuf.length, 12);
+  eocd.writeUInt32LE(30 + nameBuf.length + data.length, 16);
+  return Buffer.concat([local, nameBuf, data, central, nameBuf, eocd]);
+}
 import { listKnowledgeMarkdown } from "./knowledge";
 
 describe("normalizeKnowledgeZipEntry", () => {
@@ -128,11 +169,10 @@ describe("knowledge zip merge", () => {
     expect(buffer.byteLength).toBeGreaterThan(0);
   });
 
-  it("requires confirm and rejects traversal entries", async () => {
+  it("requires confirm and rejects raw zip-slip names", async () => {
     const root = await tempRepo();
-    const zip = new JSZip();
-    zip.file("knowledge/../../etc/passwd.md", "nope");
-    const incoming = await zip.generateAsync({ type: "nodebuffer" });
+    const incoming = storeZip("../etc/passwd.md", "nope");
+    expect(listRawZipEntryNames(incoming)).toEqual(["../etc/passwd.md"]);
 
     const unconfirmed = await applyKnowledgeZip(incoming, {
       confirm: false,
@@ -152,5 +192,8 @@ describe("knowledge zip merge", () => {
       expect(rejected.error).toMatch(/outside knowledge/);
       expect(rejected.rejected?.length).toBeGreaterThan(0);
     }
+    await expect(
+      fs.access(path.join(root, "etc", "passwd.md")),
+    ).rejects.toThrow();
   });
 });

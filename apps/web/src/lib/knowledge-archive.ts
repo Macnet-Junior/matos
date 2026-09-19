@@ -88,6 +88,36 @@ export async function buildKnowledgeZip(
   return { buffer, files };
 }
 
+/** Read central-directory names without JSZip path normalization (zip-slip check). */
+export function listRawZipEntryNames(buffer: Buffer): string[] | null {
+  if (buffer.length < 22) return null;
+  const min = Math.max(0, buffer.length - 22 - 0xffff);
+  let eocd = -1;
+  for (let i = buffer.length - 22; i >= min; i -= 1) {
+    if (buffer.readUInt32LE(i) === 0x06054b50) {
+      eocd = i;
+      break;
+    }
+  }
+  if (eocd < 0) return null;
+  const count = buffer.readUInt16LE(eocd + 10);
+  let offset = buffer.readUInt32LE(eocd + 16);
+  const names: string[] = [];
+  for (let n = 0; n < count; n += 1) {
+    if (offset + 46 > buffer.length) return null;
+    if (buffer.readUInt32LE(offset) !== 0x02014b50) return null;
+    const nameLen = buffer.readUInt16LE(offset + 28);
+    const extraLen = buffer.readUInt16LE(offset + 30);
+    const commentLen = buffer.readUInt16LE(offset + 32);
+    if (offset + 46 + nameLen > buffer.length) return null;
+    names.push(
+      buffer.subarray(offset + 46, offset + 46 + nameLen).toString("utf8"),
+    );
+    offset += 46 + nameLen + extraLen + commentLen;
+  }
+  return names;
+}
+
 export async function applyKnowledgeZip(
   buffer: Buffer,
   opts: { confirm: boolean; base?: string },
@@ -105,6 +135,22 @@ export async function applyKnowledgeZip(
   }
   if (buffer.byteLength > MAX_KNOWLEDGE_ZIP_BYTES) {
     return { ok: false, status: 400, error: "Zip exceeds 10MB limit" };
+  }
+
+  const rawNames = listRawZipEntryNames(buffer);
+  if (rawNames) {
+    const rawRejected = rawNames
+      .map((name) => normalizeKnowledgeZipEntry(name))
+      .filter((m): m is { reject: string } => "reject" in m)
+      .map((m) => m.reject);
+    if (rawRejected.length) {
+      return {
+        ok: false,
+        status: 400,
+        error: "Zip contains paths outside knowledge/",
+        rejected: rawRejected,
+      };
+    }
   }
 
   let zip: JSZip;
