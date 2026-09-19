@@ -3,6 +3,8 @@ import { parseEvidenceLinks } from "@matos/db";
 import {
   createDepartmentSchema,
   createSkillSchema,
+  skillPackageItemSchema,
+  skillsPackageSchema,
   updateSkillSchema,
 } from "./validation";
 import { computeAutoArrange, computeStats } from "./map-layout";
@@ -63,6 +65,39 @@ describe("Zod validation", () => {
   it("rejects evidence without url/label", () => {
     const parsed = updateSkillSchema.safeParse({
       evidence: [{ url: "", label: "x" }],
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it("accepts a skills package item with departmentSlug", () => {
+    const parsed = skillPackageItemSchema.safeParse({
+      slug: "hook-lab",
+      title: "Hook Lab",
+      description: "Generate hooks",
+      departmentSlug: "script",
+      status: "authored",
+      reviewGate: "Warm",
+      knowledgePaths: ["knowledge/brand/voice.md"],
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it("rejects skill package items that escape knowledge/", () => {
+    const parsed = skillPackageItemSchema.safeParse({
+      slug: "hook-lab",
+      title: "Hook Lab",
+      description: "Generate hooks",
+      departmentSlug: "script",
+      knowledgePaths: ["knowledge/../../etc/passwd"],
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it("rejects an empty skills package", () => {
+    const parsed = skillsPackageSchema.safeParse({
+      format: "matos-skills",
+      version: 1,
+      skills: [],
     });
     expect(parsed.success).toBe(false);
   });

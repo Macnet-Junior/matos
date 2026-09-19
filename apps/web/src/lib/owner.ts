@@ -104,6 +104,22 @@ export async function requireSkillEdit() {
   });
 }
 
+/** Owner / Author — download skills JSON or knowledge zip. */
+export async function requireSkillPackageExport() {
+  return requirePermission("skill:edit", {
+    rateKey: "skill-package-export",
+    rateLimit: 10,
+  });
+}
+
+/** Owner / Author — upsert skills or merge knowledge markdown. */
+export async function requireSkillPackageImport() {
+  return requirePermission("skill:edit", {
+    rateKey: "skill-package-import",
+    rateLimit: 20,
+  });
+}
+
 export async function requireWorkflowManage() {
   return requirePermission("workflow:manage", {
     rateKey: "workflow-manage",

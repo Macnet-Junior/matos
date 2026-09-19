@@ -114,6 +114,8 @@ Credentials provider only (dev). Mutations gated by RBAC. See `docs/SECURITY.md`
 | Route | Purpose |
 |---|---|
 | `/activity` | Trail + Owner **Download JSON** |
+| `/skills` | Skill list + Owner/Author **Export JSON** / **Import JSON** |
+| `/knowledge` | Markdown browser + Owner/Author **Export ZIP** / **Import ZIP** (merge) |
 | `/workflows` | Chains; Operator can dry-run |
 | `/settings/channels` | Late.dev / Etsy / WhatsApp stubs |
 | `docs/LAUNCH.md` | Env + deferred host/connect steps |

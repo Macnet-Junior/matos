@@ -35,7 +35,9 @@ Auth.js v5 with the JWT strategy sets an HTTP-only session cookie and uses its b
 
 ## Rate limiting
 
-Sensitive POSTs (map/skill/workflow mutations, runs, gate advances, activity export) use a simple **in-memory** per-process rate limiter (`apps/web/src/lib/rate-limit.ts`). Returns HTTP 429 when exceeded. Replace with Redis / edge limits before multi-node production.
+Sensitive POSTs (map/skill/workflow mutations, runs, gate advances, activity export, skills/knowledge import) and bulk downloads (activity / skills JSON / knowledge zip) use a simple **in-memory** per-process rate limiter (`apps/web/src/lib/rate-limit.ts`). Returns HTTP 429 when exceeded. Replace with Redis / edge limits before multi-node production.
+
+Skills and knowledge import/export reuse `skill:edit` (Owner + Author) via `requireSkillPackageExport` / `requireSkillPackageImport` — no new role. Knowledge zip entries are path-joined only under `knowledge/` (traversal rejected; merge overwrite, no wipe).
 
 ## Debug routes
 

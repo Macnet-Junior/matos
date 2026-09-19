@@ -1,3 +1,4 @@
+import type { Dirent } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { prisma } from "@matos/db";
@@ -13,20 +14,24 @@ export function repoRoot(): string {
   return path.resolve(process.cwd(), "../..");
 }
 
-export function resolveKnowledgePath(rel: string): string | null {
+export function resolveKnowledgePath(
+  rel: string,
+  base = repoRoot(),
+): string | null {
   const cleaned = rel.replace(/^\/+/, "").replace(/\\/g, "/");
   if (!cleaned.startsWith("knowledge/")) return null;
-  if (cleaned.includes("..")) return null;
-  const abs = path.resolve(repoRoot(), cleaned);
-  const root = path.resolve(repoRoot(), "knowledge");
+  if (cleaned.includes("..") || cleaned.includes("\0")) return null;
+  const abs = path.resolve(base, cleaned);
+  const root = path.resolve(base, "knowledge");
   if (!abs.startsWith(root + path.sep) && abs !== root) return null;
   return abs;
 }
 
 export async function readKnowledgeFile(
   rel: string,
+  base = repoRoot(),
 ): Promise<{ path: string; content: string } | { error: string }> {
-  const abs = resolveKnowledgePath(rel);
+  const abs = resolveKnowledgePath(rel, base);
   if (!abs) return { error: "Invalid knowledge path" };
   try {
     const content = await fs.readFile(abs, "utf8");
@@ -36,8 +41,11 @@ export async function readKnowledgeFile(
   }
 }
 
-export async function knowledgeFileExists(rel: string): Promise<boolean> {
-  const abs = resolveKnowledgePath(rel);
+export async function knowledgeFileExists(
+  rel: string,
+  base = repoRoot(),
+): Promise<boolean> {
+  const abs = resolveKnowledgePath(rel, base);
   if (!abs) return false;
   try {
     await fs.access(abs);
@@ -45,6 +53,53 @@ export async function knowledgeFileExists(rel: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+export async function listKnowledgeMarkdown(
+  base = repoRoot(),
+): Promise<string[]> {
+  const root = path.join(base, "knowledge");
+  async function walk(dir: string, prefix: string): Promise<string[]> {
+    let entries: Dirent[];
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true });
+    } catch {
+      return [];
+    }
+    const out: string[] = [];
+    for (const entry of entries) {
+      const abs = path.join(dir, entry.name);
+      const rel = `${prefix}/${entry.name}`;
+      if (entry.isDirectory()) {
+        if (entry.name.startsWith(".") || entry.name === "__MACOSX") continue;
+        out.push(...(await walk(abs, rel)));
+      } else if (entry.name.endsWith(".md") && !entry.name.startsWith(".")) {
+        out.push(rel);
+      }
+    }
+    return out;
+  }
+  return (await walk(root, "knowledge")).sort();
+}
+
+const MAX_KNOWLEDGE_FILE_BYTES = 512 * 1024;
+
+export async function writeKnowledgeFile(
+  rel: string,
+  content: string,
+  base = repoRoot(),
+): Promise<{ path: string } | { error: string }> {
+  if (!rel.toLowerCase().endsWith(".md")) {
+    return { error: "Only .md files may be written" };
+  }
+  if (Buffer.byteLength(content, "utf8") > MAX_KNOWLEDGE_FILE_BYTES) {
+    return { error: "File exceeds 512KB limit" };
+  }
+  const abs = resolveKnowledgePath(rel, base);
+  if (!abs) return { error: "Invalid knowledge path" };
+  await fs.mkdir(path.dirname(abs), { recursive: true });
+  await fs.writeFile(abs, content, "utf8");
+  return { path: rel };
 }
 
 /**

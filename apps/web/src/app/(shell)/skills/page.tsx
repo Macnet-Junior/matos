@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Badge } from "@matos/ui";
 import { getSessionFlags } from "@/lib/owner";
 import { loadMapPayload } from "@/lib/map-data";
+import { SkillsPackageActions } from "@/components/SkillsPackageActions";
 import type { SkillStatus } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +14,7 @@ function tone(status: SkillStatus): "citron" | "muted" | "danger" {
 }
 
 export default async function Page() {
-  const { email } = await getSessionFlags();
+  const { email, canEditSkills } = await getSessionFlags();
   const map = await loadMapPayload(email);
   const rows = map.departments.flatMap((d) =>
     d.skills.map((s) => ({ skill: s, department: d.name })),
@@ -21,12 +22,15 @@ export default async function Page() {
 
   return (
     <main className="flex flex-1 flex-col bg-matos-bg">
-      <div className="border-b border-matos-soft px-[22px] py-4">
-        <h1 className="text-base font-semibold tracking-tight">Skills</h1>
-        <p className="mt-1.5 max-w-xl text-xs text-matos-muted">
-          {map.stats.skillCount} skills · {map.stats.authored} authored ·{" "}
-          {map.stats.planned} planned · {map.stats.missing} missing
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-matos-soft px-[22px] py-4">
+        <div>
+          <h1 className="text-base font-semibold tracking-tight">Skills</h1>
+          <p className="mt-1.5 max-w-xl text-xs text-matos-muted">
+            {map.stats.skillCount} skills · {map.stats.authored} authored ·{" "}
+            {map.stats.planned} planned · {map.stats.missing} missing
+          </p>
+        </div>
+        <SkillsPackageActions enabled={canEditSkills} />
       </div>
       <div className="overflow-auto p-[22px]">
         <div className="overflow-hidden rounded-xl border border-matos-border">

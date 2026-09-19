@@ -36,6 +36,78 @@ export const updateDepartmentSchema = z.object({
   expanded: z.boolean().optional(),
 });
 
+export const knowledgePathSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(200)
+  .refine(
+    (p) =>
+      p.startsWith("knowledge/") &&
+      !p.includes("..") &&
+      !p.includes("\\") &&
+      !p.includes("\0"),
+    "knowledge path must stay under knowledge/",
+  );
+
+export const skillPackageItemSchema = z
+  .object({
+    id: z.string().trim().min(1).max(80).optional(),
+    slug: z
+      .string()
+      .trim()
+      .min(2)
+      .max(60)
+      .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "slug must be kebab-case"),
+    title: z.string().trim().min(2).max(100).optional(),
+    name: z.string().trim().min(2).max(100).optional(),
+    description: z.string().trim().min(2).max(400),
+    departmentId: z.string().trim().min(1).optional(),
+    departmentSlug: z
+      .string()
+      .trim()
+      .min(2)
+      .max(40)
+      .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "departmentSlug must be kebab-case")
+      .optional(),
+    departmentName: z.string().trim().max(80).optional(),
+    status: skillStatusSchema.optional(),
+    owner: z.string().trim().min(1).max(80).optional(),
+    reviewGate: reviewGateSchema.optional(),
+    purpose: z.string().trim().max(500).optional(),
+    instructions: z.string().trim().max(8000).optional(),
+    steps: z.array(z.string().trim().min(1).max(400)).max(40).optional(),
+    evidence: z.array(evidenceLinkSchema).max(40).optional(),
+    knowledgePaths: z.array(knowledgePathSchema).max(20).optional(),
+    knowledge: z
+      .array(
+        z.object({
+          path: knowledgePathSchema,
+          title: z.string().trim().max(120).nullable().optional(),
+          sortOrder: z.number().int().optional(),
+        }),
+      )
+      .max(20)
+      .optional(),
+    posX: z.number().finite().nullable().optional(),
+    posY: z.number().finite().nullable().optional(),
+  })
+  .refine((v) => Boolean(v.title?.trim() || v.name?.trim()), {
+    message: "title or name is required",
+  })
+  .refine((v) => Boolean(v.departmentId || v.departmentSlug), {
+    message: "departmentId or departmentSlug is required",
+  });
+
+export const skillsPackageSchema = z.object({
+  format: z.literal("matos-skills").optional(),
+  version: z.number().int().positive().max(1).optional(),
+  exportedAt: z.string().optional(),
+  exportedBy: z.string().optional(),
+  count: z.number().int().nonnegative().optional(),
+  skills: z.array(skillPackageItemSchema).min(1).max(500),
+});
+
 export const createSkillSchema = z.object({
   departmentId: z.string().trim().min(1),
   slug: z

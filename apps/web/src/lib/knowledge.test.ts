@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   deriveSkillStatus,
   evaluateSkillEncoding,
+  listKnowledgeMarkdown,
   resolveKnowledgePath,
 } from "./knowledge";
 import type { SkillDTO } from "./types";
@@ -14,6 +15,19 @@ describe("knowledge paths", () => {
     expect(resolveKnowledgePath("../etc/passwd")).toBeNull();
     expect(resolveKnowledgePath("knowledge/../../etc/passwd")).toBeNull();
     expect(resolveKnowledgePath("apps/web/package.json")).toBeNull();
+  });
+
+  it("lists the repo knowledge markdown tree", async () => {
+    const files = await listKnowledgeMarkdown();
+    expect(files).toEqual(
+      expect.arrayContaining([
+        "knowledge/brand/voice.md",
+        "knowledge/content/mix-ratios.md",
+      ]),
+    );
+    expect(files.every((f) => f.startsWith("knowledge/") && f.endsWith(".md"))).toBe(
+      true,
+    );
   });
 });
 
