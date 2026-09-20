@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { MarkdownView } from "@/components/MarkdownView";
 
 type Msg = {
   id: string;
@@ -82,7 +83,11 @@ export function SupportChat({
             <div className="mb-1 text-[10px] uppercase tracking-[0.08em] text-matos-muted2">
               {m.role}
             </div>
-            {m.body}
+            {m.role === "assistant" ? (
+              <MarkdownView content={m.body} />
+            ) : (
+              m.body
+            )}
           </div>
         ))}
       </div>

@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { knowledgeHref } from "@/lib/app-links";
 
 type Ticket = {
   id: string;
@@ -160,7 +162,12 @@ export function SupportCenter({
           <ul className="mt-2 space-y-1.5">
             {faqs.map((f) => (
               <li key={f.path} className="text-xs text-matos-muted">
-                <span className="text-matos-text">{f.title}</span>
+                <Link
+                  href={knowledgeHref(f.path)}
+                  className="text-matos-text hover:text-matos-citron"
+                >
+                  {f.title}
+                </Link>
                 <span className="mt-0.5 block font-mono text-[10px] text-matos-muted2">
                   {f.path}
                 </span>

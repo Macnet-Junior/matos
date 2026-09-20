@@ -6,13 +6,18 @@ import { KnowledgeArchiveActions } from "@/components/KnowledgeArchiveActions";
 
 export const dynamic = "force-dynamic";
 
-export default async function Page() {
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<{ path?: string }>;
+}) {
   const { canEditSkills } = await getSessionFlags();
   const files = await listKnowledgeMarkdown();
   const links = await prisma.skillKnowledge.findMany({
     include: { skill: { select: { slug: true, title: true } } },
     orderBy: { path: "asc" },
   });
+  const { path: initialPath } = await searchParams;
 
   return (
     <main className="flex flex-1 flex-col bg-matos-bg">
@@ -28,6 +33,7 @@ export default async function Page() {
       </div>
       <KnowledgeBrowser
         files={files}
+        initialPath={initialPath}
         links={links.map((l) => ({
           id: l.id,
           path: l.path,

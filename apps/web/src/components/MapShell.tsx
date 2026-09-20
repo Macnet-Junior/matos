@@ -24,15 +24,37 @@ async function readError(res: Response): Promise<string> {
   }
 }
 
-export function MapShell({ initial }: { initial: MapPayload }) {
-  const [map, setMap] = useState<MapPayload>(initial);
-  const [selection, setSelection] = useState<Selection>(() => {
-    const skill =
-      initial.departments
-        .flatMap((d) => d.skills)
-        .find((s) => s.slug === "content-calendar") ?? null;
-    return skill ? { kind: "skill", skill } : { kind: "company" };
-  });
+function focusSkill(
+  payload: MapPayload,
+  slug?: string | null,
+): { map: MapPayload; selection: Selection } {
+  const all = payload.departments.flatMap((d) => d.skills);
+  const skill =
+    (slug ? all.find((s) => s.slug === slug) : undefined) ??
+    all.find((s) => s.slug === "content-calendar") ??
+    null;
+  if (!skill) return { map: payload, selection: { kind: "company" } };
+  return {
+    map: {
+      ...payload,
+      departments: payload.departments.map((d) =>
+        d.id === skill.departmentId ? { ...d, expanded: true } : d,
+      ),
+    },
+    selection: { kind: "skill", skill },
+  };
+}
+
+export function MapShell({
+  initial,
+  focusSkillSlug,
+}: {
+  initial: MapPayload;
+  focusSkillSlug?: string | null;
+}) {
+  const focused = focusSkill(initial, focusSkillSlug);
+  const [map, setMap] = useState<MapPayload>(focused.map);
+  const [selection, setSelection] = useState<Selection>(focused.selection);
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);

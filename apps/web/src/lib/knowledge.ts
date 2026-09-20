@@ -102,27 +102,47 @@ export async function writeKnowledgeFile(
   return { path: rel };
 }
 
-/**
- * Derive display status from content completeness.
- * - authored: non-empty instructions AND at least one existing knowledge file
- * - missing: claimed authored/planned but knowledge files absent OR empty instructions with links expected
- * - planned: otherwise
- */
-export async function deriveSkillStatus(skill: {
-  instructions: string;
+/** knowledge/ paths claimed by a skill (canonical links + evidence URLs). */
+export function collectKnowledgeRefs(skill: {
   knowledge: { path: string }[];
-  status: SkillStatus;
-}): Promise<SkillStatus> {
-  const hasInstructions = skill.instructions.trim().length > 0;
-  const links = skill.knowledge;
-  if (!hasInstructions && links.length === 0) {
-    return skill.status === "missing" ? "missing" : "planned";
+  evidence?: { url: string }[];
+}): string[] {
+  const refs: string[] = [];
+  for (const item of skill.knowledge) {
+    const rel = item.path.trim();
+    if (rel) refs.push(rel);
   }
-  if (!hasInstructions) return "missing";
-  if (links.length === 0) return "missing";
-  const exists = await Promise.all(links.map((k) => knowledgeFileExists(k.path)));
-  if (exists.every(Boolean)) return "authored";
-  return "missing";
+  for (const item of skill.evidence ?? []) {
+    const url = item.url.trim();
+    if (url.startsWith("knowledge/")) refs.push(url);
+  }
+  return [...new Set(refs)];
+}
+
+/**
+ * Derive display status from content completeness — never from a stored label.
+ * - authored: non-empty instructions AND ≥1 knowledge link AND every claimed file exists
+ * - missing: a claimed knowledge/evidence path is absent on disk, OR instructions exist with no knowledge links
+ * - planned: no instructions yet (honest empty state), including deferred skills
+ */
+export async function deriveSkillStatus(
+  skill: {
+    instructions: string;
+    knowledge: { path: string }[];
+    evidence?: { url: string }[];
+    status?: SkillStatus;
+  },
+  base = repoRoot(),
+): Promise<SkillStatus> {
+  const hasInstructions = skill.instructions.trim().length > 0;
+  const refs = collectKnowledgeRefs(skill);
+  const exists = await Promise.all(
+    refs.map((rel) => knowledgeFileExists(rel, base)),
+  );
+  if (exists.some((ok) => !ok)) return "missing";
+  if (!hasInstructions) return "planned";
+  if (skill.knowledge.length === 0) return "missing";
+  return "authored";
 }
 
 export async function withDerivedStatuses(

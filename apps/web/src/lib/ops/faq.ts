@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { repoRoot } from "@/lib/knowledge";
+import { knowledgeHref } from "@/lib/app-links";
 
 export type FaqDoc = {
   path: string;
@@ -124,14 +125,14 @@ export async function matchFaq(query: string): Promise<FaqReply> {
   }
 
   const top = matches[0];
-  const text = `From **${top.title}** (${top.path}):\n\n${top.excerpt}${
+  const also =
     matches.length > 1
       ? `\n\nAlso see: ${matches
           .slice(1)
-          .map((m) => m.title)
+          .map((m) => `[${m.title}](${knowledgeHref(m.path)})`)
           .join(", ")}`
-      : ""
-  }`;
+      : "";
+  const text = `From **[${top.title}](${knowledgeHref(top.path)})**:\n\n${top.excerpt}${also}`;
 
   return { kind: "answer", text, matches, usedLlm: false };
 }
