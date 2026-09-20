@@ -1,7 +1,9 @@
+import Link from "next/link";
 import { Badge } from "@matos/ui";
 import { getSessionFlags } from "@/lib/owner";
 import { loadMapPayload } from "@/lib/map-data";
 import { evaluateSkillEncoding } from "@/lib/knowledge";
+import { skillMapHref } from "@/lib/app-links";
 
 export const dynamic = "force-dynamic";
 
@@ -76,7 +78,12 @@ export default async function Page() {
                   className="border-t border-matos-soft bg-matos-panel align-top"
                 >
                   <td className="px-3 py-2.5">
-                    <div className="font-mono text-matos-citron">{row.slug}</div>
+                    <Link
+                      href={skillMapHref(row.slug)}
+                      className="font-mono text-matos-citron hover:underline"
+                    >
+                      {row.slug}
+                    </Link>
                     <div className="mt-0.5 text-matos-muted">{row.title}</div>
                   </td>
                   <td className="px-3 py-2.5 text-matos-muted">

@@ -25,25 +25,43 @@ async function readError(res: Response): Promise<string> {
   }
 }
 
+function focusSkill(
+  payload: MapPayload,
+  slug?: string | null,
+): { map: MapPayload; selection: Selection } {
+  const all = payload.departments.flatMap((d) => d.skills);
+  const skill =
+    (slug ? all.find((s) => s.slug === slug) : undefined) ??
+    all.find((s) => s.slug === "content-calendar") ??
+    null;
+  if (!skill) return { map: payload, selection: { kind: "company" } };
+  return {
+    map: {
+      ...payload,
+      departments: payload.departments.map((d) =>
+        d.id === skill.departmentId ? { ...d, expanded: true } : d,
+      ),
+    },
+    selection: { kind: "skill", skill },
+  };
+}
+
 export function MapShell({
   initial,
   focusSlug,
 }: {
   initial: MapPayload;
   /**
-   * A skill to open on arrival, from the desk's "fix this skill" link. Falls
-   * back to the calendar skill, which is the one a new company is most likely
-   * to be working on first.
+   * A skill to open on arrival, from the desk's "fix this skill" link or a
+   * `/map?skill=` deep link. Falls back to the calendar skill, which is the
+   * one a new company is most likely to be working on first. The skill's
+   * department is expanded so the node is visible.
    */
   focusSlug?: string | null;
 }) {
-  const [map, setMap] = useState<MapPayload>(initial);
-  const [selection, setSelection] = useState<Selection>(() => {
-    const skills = initial.departments.flatMap((d) => d.skills);
-    const skill =
-      skills.find((s) => s.slug === (focusSlug ?? "content-calendar")) ?? null;
-    return skill ? { kind: "skill", skill } : { kind: "company" };
-  });
+  const focused = focusSkill(initial, focusSlug);
+  const [map, setMap] = useState<MapPayload>(focused.map);
+  const [selection, setSelection] = useState<Selection>(focused.selection);
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);

@@ -10,6 +10,7 @@ import type {
   SkillDTO,
   SkillStatus,
 } from "@/lib/types";
+import { isKnowledgePath, knowledgeHref } from "@/lib/app-links";
 import { MarkdownView } from "./MarkdownView";
 
 type Tab = "instructions" | "knowledge" | "evidence";
@@ -184,13 +185,14 @@ function EvidenceTab({
                 {item.label}
               </div>
               <a
-                href={item.url.startsWith("knowledge/") ? "#" : item.url}
+                href={
+                  isKnowledgePath(item.url)
+                    ? knowledgeHref(item.url)
+                    : item.url
+                }
                 className="mt-0.5 block truncate font-mono text-[10px] text-matos-citron"
                 target={item.url.startsWith("http") ? "_blank" : undefined}
                 rel={item.url.startsWith("http") ? "noreferrer" : undefined}
-                onClick={(e) => {
-                  if (item.url.startsWith("knowledge/")) e.preventDefault();
-                }}
                 title={item.url}
               >
                 {item.url}
