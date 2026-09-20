@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   scoreFaqQuery,
   shouldEscalateToTicket,
+  matchFaq,
   type FaqDoc,
 } from "./faq";
 import { assertCanEnableRule } from "./auto-response";
@@ -59,6 +60,13 @@ describe("FAQ matcher", () => {
     expect(shouldEscalateToTicket("I want a refund please")).toBe(true);
     expect(shouldEscalateToTicket("money back now")).toBe(true);
     expect(shouldEscalateToTicket("how do I connect Late")).toBe(false);
+  });
+
+  it("answers with a knowledge browser href for FAQ files", async () => {
+    const reply = await matchFaq("how do credits and stripe work?");
+    expect(reply.kind).toBe("answer");
+    expect(reply.text).toContain("/knowledge?path=");
+    expect(reply.matches[0]?.path).toMatch(/^knowledge\/support\//);
   });
 });
 

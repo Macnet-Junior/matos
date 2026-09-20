@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Page() {
   return (
     <main className="flex flex-1 flex-col bg-matos-bg">
@@ -8,8 +10,10 @@ export default function Page() {
       <div className="p-[22px]">
         <div className="rounded-xl border border-matos-border bg-matos-panel p-4 text-xs text-matos-muted">
           Phase 0 shell surface — content lands in a later phase. Use{" "}
-          <span className="text-matos-text">Company map</span> for the live
-          canvas.
+          <Link href="/map" className="text-matos-citron">
+            Company map
+          </Link>{" "}
+          for the live canvas.
         </div>
       </div>
     </main>

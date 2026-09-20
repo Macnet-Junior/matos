@@ -3,48 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
-
-const workspace = [
-  { href: "/home", label: "Home" },
-  { href: "/brief", label: "Company brief" },
-  { href: "/map", label: "Company map" },
-  { href: "/workbook", label: "Workbook" },
-  { href: "/repository", label: "Repository" },
-];
-
-const build = [
-  { href: "/workflows", label: "Workflows" },
-  { href: "/skills", label: "Skills" },
-  { href: "/knowledge", label: "Knowledge" },
-  { href: "/activity", label: "Activity" },
-  { href: "/settings/channels", label: "Channels" },
-];
-
-const ops = [
-  { href: "/ops", label: "Ops home" },
-  { href: "/ops/feed", label: "Feed" },
-  { href: "/ops/presence", label: "Presence" },
-  { href: "/ops/usage", label: "Usage" },
-  { href: "/ops/billing", label: "Billing" },
-  { href: "/ops/auto-response", label: "Auto-response" },
-];
-
-const support = [
-  { href: "/support", label: "Tickets" },
-  { href: "/support/chat", label: "Chatbot" },
-];
-
-const desk = [
-  { href: "/desk", label: "Desk" },
-  { href: "/calendar", label: "Calendar" },
-  { href: "/inbox", label: "Inbox" },
-];
-
-const library = [
-  { href: "/library", label: "Library" },
-  { href: "/library/encoding-guide", label: "Encoding guide" },
-  { href: "/library/desk", label: "Desk archive" },
-];
+import {
+  buildNav,
+  deskNav,
+  libraryNav,
+  opsNav,
+  supportNav,
+  workspaceNav,
+} from "@/lib/shell-nav";
 
 function NavLink({ href, label }: { href: string; label: string }) {
   const pathname = usePathname();
@@ -113,12 +79,12 @@ export function Sidebar() {
         </div>
       </div>
 
-      <Section title="Workspace" items={workspace} />
-      <Section title="Build & Operate" items={build} />
-      <Section title="Desk" items={desk} />
-      {canViewOps ? <Section title="Ops" items={ops} /> : null}
-      <Section title="Support" items={support} />
-      <Section title="Library" items={library} />
+      <Section title="Workspace" items={workspaceNav} />
+      <Section title="Build & Operate" items={buildNav} />
+      <Section title="Desk" items={deskNav} />
+      {canViewOps ? <Section title="Ops" items={opsNav} /> : null}
+      <Section title="Support" items={supportNav} />
+      <Section title="Library" items={libraryNav} />
 
       <div className="mt-auto p-2">
         <div className="rounded-[10px] border border-matos-border bg-matos-panel p-3">

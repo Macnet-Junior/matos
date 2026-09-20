@@ -67,6 +67,8 @@ Center node: **MatOS Agency**.
 | `content-calendar` | Calendar & Queue |
 | `etsy-listing-lab` | Monetization |
 
+Remaining catalog skills stay **planned** until they have instructions plus existing knowledge files. `missing` is reserved for broken knowledge/evidence refs — not deferred publish work (`etsy-publish`, `whatsapp-drop`).
+
 ## Hosting
 
 Host / deploy deferred. Local `pnpm dev` is the delivery surface. See `docs/LAUNCH.md`.

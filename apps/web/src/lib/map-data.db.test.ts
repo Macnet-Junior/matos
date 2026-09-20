@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "@matos/db";
+import { collectKnowledgeRefs, knowledgeFileExists } from "./knowledge";
 import { loadMapPayload } from "./map-data";
 
 describe("SQLite map payload", () => {
@@ -53,5 +54,39 @@ describe("SQLite map payload", () => {
       ]),
     );
     expect(etsy?.evidence[0]?.label).toBeTruthy();
+  });
+
+  it("seeded skill knowledge and evidence files exist on disk", async () => {
+    const map = await loadMapPayload(null);
+    const skills = map.departments.flatMap((d) => d.skills);
+    const missing: string[] = [];
+    for (const skill of skills) {
+      for (const rel of collectKnowledgeRefs(skill)) {
+        if (!(await knowledgeFileExists(rel))) {
+          missing.push(`${skill.slug}: ${rel}`);
+        }
+      }
+    }
+    expect(missing).toEqual([]);
+  });
+
+  it("treats the former missing catalog as planned, not broken", async () => {
+    const map = await loadMapPayload(null);
+    const bySlug = Object.fromEntries(
+      map.departments.flatMap((d) => d.skills).map((s) => [s.slug, s]),
+    );
+    for (const slug of [
+      "trend-radar",
+      "voice-miner",
+      "offer-fit",
+      "offer-ladder",
+      "etsy-publish",
+      "whatsapp-drop",
+    ]) {
+      expect(bySlug[slug]?.status, slug).toBe("planned");
+    }
+    expect(map.stats.authored).toBe(4);
+    expect(map.stats.missing).toBe(0);
+    expect(map.stats.skillCount).toBe(33);
   });
 });

@@ -4,8 +4,13 @@ import { loadMapPayload } from "@/lib/map-data";
 
 export const dynamic = "force-dynamic";
 
-export default async function MapPage() {
+export default async function MapPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ skill?: string }>;
+}) {
   const { email } = await getSessionFlags();
   const initial = await loadMapPayload(email);
-  return <MapShell initial={initial} />;
+  const { skill } = await searchParams;
+  return <MapShell initial={initial} focusSkillSlug={skill} />;
 }

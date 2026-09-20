@@ -1,6 +1,7 @@
 "use client";
 
 import ReactMarkdown from "react-markdown";
+import { isKnowledgePath, knowledgeHref } from "@/lib/app-links";
 
 export function MarkdownView({
   content,
@@ -44,16 +45,20 @@ export function MarkdownView({
             <ol className="mb-2 list-decimal space-y-1 pl-4">{children}</ol>
           ),
           li: ({ children }) => <li>{children}</li>,
-          a: ({ href, children }) => (
-            <a
-              href={href}
-              className="text-matos-citron underline-offset-2 hover:underline"
-              target={href?.startsWith("http") ? "_blank" : undefined}
-              rel={href?.startsWith("http") ? "noreferrer" : undefined}
-            >
-              {children}
-            </a>
-          ),
+          a: ({ href, children }) => {
+            const resolved =
+              href && isKnowledgePath(href) ? knowledgeHref(href) : href;
+            return (
+              <a
+                href={resolved}
+                className="text-matos-citron underline-offset-2 hover:underline"
+                target={resolved?.startsWith("http") ? "_blank" : undefined}
+                rel={resolved?.startsWith("http") ? "noreferrer" : undefined}
+              >
+                {children}
+              </a>
+            );
+          },
           code: ({ children }) => (
             <code className="rounded bg-matos-bg px-1 py-0.5 font-mono text-[11px] text-matos-citron">
               {children}

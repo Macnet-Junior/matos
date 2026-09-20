@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
+import { skillMapHref } from "@/lib/app-links";
 import { MarkdownView } from "./MarkdownView";
 
 type LinkRow = {
@@ -13,11 +15,15 @@ type LinkRow = {
 export function KnowledgeBrowser({
   files,
   links,
+  initialPath,
 }: {
   files: string[];
   links: LinkRow[];
+  initialPath?: string | null;
 }) {
-  const [active, setActive] = useState<string | null>(files[0] ?? null);
+  const [active, setActive] = useState<string | null>(
+    initialPath || files[0] || null,
+  );
   const [content, setContent] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -90,7 +96,14 @@ export function KnowledgeBrowser({
                 {l.path}
               </button>
               <div className="mt-1 text-matos-muted">
-                {l.skillSlug} · {l.skillTitle}
+                <Link
+                  href={skillMapHref(l.skillSlug)}
+                  className="text-matos-citron hover:underline"
+                >
+                  {l.skillSlug}
+                </Link>
+                {" · "}
+                {l.skillTitle}
               </div>
             </li>
           ))}
