@@ -5,6 +5,7 @@
   "description": "MatOS — company operating layer",
   "scripts": {
     "dev": "pnpm --filter web dev",
+    "dev:skillwright": "pnpm --filter skillwright dev",
     "build": "pnpm db:generate && pnpm --filter web build",
     "lint": "pnpm --filter web lint",
     "typecheck": "pnpm --filter web typecheck",
