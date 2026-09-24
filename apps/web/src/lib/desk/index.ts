@@ -1,6 +1,8 @@
-import { parseJsonArray, prisma } from "@matos/db";
+import { parseJsonArray, parseJsonObject, prisma } from "@matos/db";
 import { appendActivity } from "@/lib/map-data";
 import { recordUsageEvent } from "@/lib/ops/usage";
+import type { ContentPackage } from "@/lib/content-platforms";
+import { buildChannelPackages } from "./press-packages";
 import { getDeskProvider } from "./provider";
 import {
   DESK_STAGES,
@@ -18,6 +20,16 @@ import {
 export * from "./stages";
 export * from "./provider";
 
+export type DeskArtifactRevisionDTO = {
+  id: string;
+  artifactId: string;
+  title: string;
+  body: string;
+  reviewState: DeskArtifactReview;
+  editedBy: string;
+  createdAt: string;
+};
+
 export type DeskArtifactDTO = {
   id: string;
   jobId: string;
@@ -30,6 +42,7 @@ export type DeskArtifactDTO = {
   reviewNote: string;
   createdAt: string;
   updatedAt: string;
+  revisions: DeskArtifactRevisionDTO[];
 };
 
 export type DeskCalendarItemDTO = {
@@ -41,6 +54,8 @@ export type DeskCalendarItemDTO = {
   body: string;
   scheduledAt: string;
   status: string;
+  simulated: boolean;
+  publicationStatus: string | null;
   createdAt: string;
 };
 
@@ -139,8 +154,18 @@ type JobWithRelations = {
     reviewedBy: string | null;
     reviewedAt: Date | null;
     reviewNote: string;
+    packageJson: string;
     createdAt: Date;
     updatedAt: Date;
+    revisions: {
+      id: string;
+      artifactId: string;
+      title: string;
+      body: string;
+      reviewState: string;
+      editedBy: string;
+      createdAt: Date;
+    }[];
   }[];
   calendarItems: {
     id: string;
@@ -150,6 +175,8 @@ type JobWithRelations = {
     body: string;
     scheduledAt: Date;
     status: string;
+    packageJson: string;
+    simulated: boolean;
     createdAt: Date;
   }[];
   inboxItems: {
@@ -201,6 +228,18 @@ export function toDeskJobDTO(job: JobWithRelations): DeskJobDTO {
         reviewNote: a.reviewNote,
         createdAt: a.createdAt.toISOString(),
         updatedAt: a.updatedAt.toISOString(),
+        revisions: (a.revisions ?? [])
+          .slice()
+          .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+          .map((revision) => ({
+            id: revision.id,
+            artifactId: revision.artifactId,
+            title: revision.title,
+            body: normalizeDeskBody(revision.body),
+            reviewState: asReview(revision.reviewState),
+            editedBy: revision.editedBy,
+            createdAt: revision.createdAt.toISOString(),
+          })),
       })),
     calendarItems: job.calendarItems
       .slice()
@@ -213,6 +252,8 @@ export function toDeskJobDTO(job: JobWithRelations): DeskJobDTO {
         body: normalizeDeskBody(c.body),
         scheduledAt: c.scheduledAt.toISOString(),
         status: c.status,
+        simulated: c.simulated,
+        publicationStatus: c.simulated ? "simulated" : c.status,
         createdAt: c.createdAt.toISOString(),
       })),
     inboxItems: job.inboxItems
@@ -235,7 +276,11 @@ export function toDeskJobDTO(job: JobWithRelations): DeskJobDTO {
 }
 
 const jobInclude = {
-  artifacts: true,
+  artifacts: {
+    include: {
+      revisions: { orderBy: { createdAt: "desc" as const }, take: 20 },
+    },
+  },
   calendarItems: true,
   inboxItems: true,
 } as const;
@@ -434,6 +479,17 @@ export async function updateDeskArtifact(input: {
   const art = job.artifacts.find((a) => a.stage === job.stage);
   if (!art) throw new Error("No artifact for current stage — run the stage first");
 
+  await prisma.deskArtifactRevision.create({
+    data: {
+      artifactId: art.id,
+      title: art.title,
+      body: art.body,
+      packageJson: art.packageJson,
+      reviewState: art.reviewState,
+      editedBy: input.actorEmail,
+    },
+  });
+
   await prisma.deskStageArtifact.update({
     where: { id: art.id },
     data: {
@@ -471,17 +527,58 @@ export async function updateDeskArtifact(input: {
 async function materializeClock(jobId: string, channels: string[], dueAt: Date | null) {
   await prisma.deskCalendarItem.deleteMany({ where: { jobId } });
   const base = dueAt ? new Date(dueAt) : new Date(Date.now() + 2 * 86400000);
-  const job = await prisma.deskJob.findUniqueOrThrow({ where: { id: jobId } });
+  const job = await prisma.deskJob.findUniqueOrThrow({
+    where: { id: jobId },
+    include: { artifacts: true },
+  });
+  const press = job.artifacts.find((artifact) => artifact.stage === "press");
+  const packages = buildChannelPackages({
+    channels,
+    pressBody: press?.body ?? "",
+    title: job.title,
+    topic: job.topic,
+    offerCta: job.offerCta,
+  });
+  if (press) {
+    await prisma.deskStageArtifact.update({
+      where: { id: press.id },
+      data: {
+        packageJson: JSON.stringify({
+          channels: packages.map((item) => ({
+            channel: item.channel,
+            title: item.title,
+            text: item.text,
+            links: item.links,
+            media: item.media,
+            hashtags: item.hashtags,
+          })),
+        }),
+      },
+    });
+  }
   for (let i = 0; i < channels.length; i++) {
+    const channel = channels[i]!;
+    const pkg = packages.find((item) => item.channel === channel);
     const when = new Date(base.getTime() + i * 86400000);
+    const stored = pkg ?? {
+      channel,
+      title: `${job.title} · ${channel}`,
+      text: `${job.topic}\n\n${job.offerCta}`.trim(),
+      links: [] as string[],
+      media: [] as ContentPackage["media"],
+      hashtags: [] as string[],
+    };
+    const validation = pkg?.validation ?? { ok: false, errors: ["unsupported channel"] };
     await prisma.deskCalendarItem.create({
       data: {
         jobId,
-        channel: channels[i]!,
-        title: `${job.title} · ${channels[i]}`,
-        body: `Scheduled pack for ${channels[i]} (planned — no live publish).`,
+        channel,
+        title: stored.title,
+        body: stored.text,
         scheduledAt: when,
-        status: "planned",
+        status: validation.ok ? "planned" : "invalid",
+        packageJson: JSON.stringify(stored),
+        simulated: false,
       },
     });
   }
@@ -580,6 +677,16 @@ export async function reviewDeskStage(input: {
   }
 
   // approve
+  await prisma.deskArtifactRevision.create({
+    data: {
+      artifactId: art.id,
+      title: art.title,
+      body: art.body,
+      packageJson: art.packageJson,
+      reviewState: "approved",
+      editedBy: input.actorEmail,
+    },
+  });
   await prisma.deskStageArtifact.update({
     where: { id: art.id },
     data: {
@@ -648,17 +755,32 @@ export async function listCalendarItems(): Promise<DeskCalendarItemDTO[]> {
     include: { job: { select: { title: true } } },
     orderBy: { scheduledAt: "asc" },
   });
-  return rows.map((r) => ({
-    id: r.id,
-    jobId: r.jobId,
-    jobTitle: r.job.title,
-    channel: r.channel,
-    title: r.title,
-    body: r.body,
-    scheduledAt: r.scheduledAt.toISOString(),
-    status: r.status,
-    createdAt: r.createdAt.toISOString(),
-  }));
+  const publications = await prisma.deskPublication.findMany({
+    where: { jobId: { in: [...new Set(rows.map((row) => row.jobId))] } },
+  });
+  const byKey = new Map(publications.map((row) => [`${row.jobId}:${row.channel}`, row]));
+  return rows.map((r) => {
+    const publication = byKey.get(`${r.jobId}:${r.channel}`);
+    const meta = publication ? parseJsonObject(publication.metaJson) : {};
+    const simulated =
+      r.simulated ||
+      meta.simulated === true ||
+      meta.provider === "simulated" ||
+      meta.fallback === true;
+    return {
+      id: r.id,
+      jobId: r.jobId,
+      jobTitle: r.job.title,
+      channel: r.channel,
+      title: r.title,
+      body: normalizeDeskBody(r.body),
+      scheduledAt: r.scheduledAt.toISOString(),
+      status: simulated ? "simulated" : r.status,
+      simulated,
+      publicationStatus: publication?.status ?? null,
+      createdAt: r.createdAt.toISOString(),
+    };
+  });
 }
 
 export async function listInboxItems(): Promise<DeskInboxItemDTO[]> {

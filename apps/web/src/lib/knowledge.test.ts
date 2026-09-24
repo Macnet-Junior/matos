@@ -1,4 +1,8 @@
 import { describe, expect, it } from "vitest";
+
+function portablePath(value: string | null): string {
+  return (value ?? "").replace(/\\/g, "/");
+}
 import {
   deriveSkillStatus,
   evaluateSkillEncoding,
@@ -9,7 +13,7 @@ import type { SkillDTO } from "./types";
 
 describe("knowledge paths", () => {
   it("allows knowledge/ paths and blocks traversal", () => {
-    expect(resolveKnowledgePath("knowledge/brand/voice.md")).toContain(
+    expect(portablePath(resolveKnowledgePath("knowledge/brand/voice.md"))).toContain(
       "knowledge/brand/voice.md",
     );
     expect(resolveKnowledgePath("../etc/passwd")).toBeNull();

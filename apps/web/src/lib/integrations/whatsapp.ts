@@ -135,6 +135,74 @@ export class WhatsAppClient {
   }
 }
 
+/**
+ * ContentPublisher adapter. Destination is always the configured allowlist
+ * value — caller-supplied destinations are ignored.
+ */
+export class WhatsAppContentPublisher {
+  constructor(
+    private readonly opts: {
+      allowedTo: string | null;
+      token?: string | null;
+      phoneNumberId?: string | null;
+      fetchImpl?: typeof fetch;
+    },
+  ) {}
+
+  async publish(input: {
+    channel: string;
+    body: string;
+    idempotencyKey: string;
+    approved?: boolean;
+  }): Promise<{
+    externalId: string;
+    status: "planned" | "published";
+    simulated: boolean;
+    meta?: Record<string, unknown>;
+  }> {
+    if (input.channel !== "whatsapp") throw new Error("provider_error");
+    if (!input.approved) throw new Error("approval_required");
+    const destination = (this.opts.allowedTo ?? "").trim();
+    const check = assertWhatsAppDestinationAllowed(destination, this.opts.allowedTo);
+    if (!check.ok) throw new Error("destination_rejected");
+
+    if (!this.opts.token || !this.opts.phoneNumberId) {
+      const simulated = simulateWhatsAppSend({
+        to: destination,
+        text: input.body,
+        allowedTo: this.opts.allowedTo,
+        reviewGateApproved: true,
+      });
+      if (!simulated.ok || !simulated.messageId) throw new Error("destination_rejected");
+      return {
+        externalId: simulated.messageId,
+        status: "published",
+        simulated: true,
+        meta: { provider: "whatsapp", deliveryStatus: "simulated" },
+      };
+    }
+
+    const client = new WhatsAppClient({
+      token: this.opts.token,
+      phoneNumberId: this.opts.phoneNumberId,
+      allowedTo: destination,
+      fetchImpl: this.opts.fetchImpl,
+    });
+    const result = await client.sendText({
+      to: destination,
+      text: input.body,
+      reviewGateApproved: true,
+    });
+    if (!result.ok || !result.messageId) throw new Error("provider_error");
+    return {
+      externalId: result.messageId,
+      status: "published",
+      simulated: false,
+      meta: { provider: "whatsapp", deliveryStatus: "published" },
+    };
+  }
+}
+
 export function simulateWhatsAppSend(input: {
   to: string;
   text: string;

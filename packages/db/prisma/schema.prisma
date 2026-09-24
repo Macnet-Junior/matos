@@ -374,6 +374,7 @@ model DeskJob {
   artifacts    DeskStageArtifact[]
   calendarItems DeskCalendarItem[]
   inboxItems   DeskInboxItem[]
+  publications DeskPublication[]
 
   @@index([stage])
   @@index([status])
@@ -394,12 +395,31 @@ model DeskStageArtifact {
   reviewedBy  String?
   reviewedAt  DateTime?
   reviewNote  String   @default("")
+  /// Structured channel packages for Press, or "{}" for other stages.
+  packageJson String   @default("{}")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  revisions   DeskArtifactRevision[]
 
   @@unique([jobId, stage])
   @@index([jobId])
   @@index([stage])
+}
+
+/// Prior body captured before an edit or approval.
+model DeskArtifactRevision {
+  id          String            @id @default(cuid())
+  artifactId  String
+  artifact    DeskStageArtifact @relation(fields: [artifactId], references: [id], onDelete: Cascade)
+  title       String
+  body        String            @default("")
+  packageJson String            @default("{}")
+  reviewState String
+  editedBy    String
+  createdAt   DateTime          @default(now())
+
+  @@index([artifactId])
+  @@index([createdAt])
 }
 
 model DeskCalendarItem {
@@ -410,8 +430,12 @@ model DeskCalendarItem {
   title       String
   body        String   @default("")
   scheduledAt DateTime
-  /// planned | ready — no live publish in Phase 5.5
+  /// planned | invalid | simulated | published | failed
   status      String   @default("planned")
+  /// Structured channel package rendered into body.
+  packageJson String   @default("{}")
+  /// True when the latest delivery was a simulation, never a live post.
+  simulated   Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -437,4 +461,87 @@ model DeskInboxItem {
   @@index([jobId])
   @@index([status])
   @@index([createdAt])
+}
+
+/// Content delivery attempt for an approved Desk job.
+model DeskPublication {
+  id             String   @id @default(cuid())
+  jobId          String
+  job            DeskJob  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  channel        String
+  provider       String
+  idempotencyKey String   @unique
+  externalId     String?
+  /// planned | publishing | published | failed
+  status         String   @default("planned")
+  scheduledAt    DateTime?
+  publishedAt    DateTime?
+  attemptCount   Int      @default(0)
+  lastAttemptAt  DateTime?
+  error          String?
+  /// Provider response and non-secret delivery metadata.
+  metaJson       String   @default("{}")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  metrics        ContentMetric[]
+  insights       ContentInsight[]
+
+  @@unique([jobId, channel])
+  @@index([status])
+  @@index([channel])
+  @@index([scheduledAt])
+}
+
+/// Measured outcome for a published content item.
+model ContentMetric {
+  id            String         @id @default(cuid())
+  publicationId String
+  publication   DeskPublication @relation(fields: [publicationId], references: [id], onDelete: Cascade)
+  kind          String
+  value         Float
+  capturedAt    DateTime       @default(now())
+  /// Provider-specific period, post, or import metadata.
+  metaJson      String         @default("{}")
+  createdAt     DateTime       @default(now())
+
+  @@index([publicationId])
+  @@index([kind])
+  @@index([capturedAt])
+}
+
+/// Reviewed performance note that may link back to a skill or knowledge file.
+model ContentInsight {
+  id            String           @id @default(cuid())
+  publicationId String?
+  publication   DeskPublication? @relation(fields: [publicationId], references: [id], onDelete: SetNull)
+  summary       String
+  skillSlug     String?
+  knowledgePath String?
+  /// draft | reviewed
+  status        String           @default("draft")
+  reviewedBy    String?
+  reviewedAt    DateTime?
+  createdAt     DateTime         @default(now())
+
+  @@index([publicationId])
+  @@index([status])
+  @@index([skillSlug])
+}
+
+/// Scaffold for privacy export and deletion requests. Completion stays reviewed.
+model PrivacyRequest {
+  id           String    @id @default(cuid())
+  /// export | deletion
+  kind         String
+  subjectEmail String
+  /// pending | completed
+  status       String    @default("pending")
+  requestedBy  String
+  note         String    @default("")
+  createdAt    DateTime  @default(now())
+  completedAt  DateTime?
+
+  @@index([subjectEmail])
+  @@index([status])
+  @@index([kind])
 }

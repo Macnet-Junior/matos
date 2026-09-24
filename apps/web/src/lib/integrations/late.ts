@@ -114,6 +114,10 @@ export class LateClient {
       body: JSON.stringify(input),
     });
   }
+
+  async getPost(id: string): Promise<LatePostResult> {
+    return this.request<LatePostResult>(`/posts/${encodeURIComponent(id)}`);
+  }
 }
 
 /** Dry-path helper when no key — returns simulated schedule result. */

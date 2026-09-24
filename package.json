@@ -9,6 +9,7 @@
     "lint": "pnpm --filter web lint",
     "typecheck": "pnpm --filter web typecheck",
     "test": "pnpm --filter web test",
+    "test:isolated": "pnpm --filter web test:isolated",
     "audit": "pnpm audit --prod",
     "db:generate": "pnpm --filter @matos/db generate",
     "db:migrate": "pnpm --filter @matos/db migrate",

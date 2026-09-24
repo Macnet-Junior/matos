@@ -192,7 +192,8 @@ export function DeskJobDetail({
                 {job.calendarItems.map((c) => (
                   <li key={c.id}>
                     {c.channel} ·{" "}
-                    {new Date(c.scheduledAt).toLocaleDateString()}
+                    {new Date(c.scheduledAt).toLocaleDateString()} ·{" "}
+                    {c.simulated ? "simulated — not live" : c.status}
                   </li>
                 ))}
               </ul>

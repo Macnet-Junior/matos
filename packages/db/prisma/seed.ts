@@ -397,6 +397,10 @@ const DEPARTMENTS: SeedDept[] = [
 ];
 
 async function main() {
+  const seedNow = process.env.MATOS_SEED_NOW
+    ? new Date(process.env.MATOS_SEED_NOW)
+    : new Date();
+
   await prisma.runStep.deleteMany();
   await prisma.workflowRun.deleteMany();
   await prisma.workflowStep.deleteMany();
@@ -694,13 +698,13 @@ async function main() {
       {
         email: "macnet@matos.local",
         role: "Owner",
-        lastSeenAt: new Date(),
+        lastSeenAt: seedNow,
         currentPath: "/ops/feed",
       },
       {
         email: "operator@matos.local",
         role: "Operator",
-        lastSeenAt: new Date(Date.now() - 60_000),
+        lastSeenAt: new Date(seedNow.getTime() - 60_000),
         currentPath: "/workflows",
       },
     ],
@@ -708,13 +712,18 @@ async function main() {
 
 
   // --- Phase 5.5 Relay Desk sample jobs ---
+  await prisma.contentInsight.deleteMany();
+  await prisma.contentMetric.deleteMany();
+  await prisma.deskPublication.deleteMany();
+  await prisma.privacyRequest.deleteMany();
+  await prisma.deskArtifactRevision.deleteMany();
   await prisma.deskInboxItem.deleteMany();
   await prisma.deskCalendarItem.deleteMany();
   await prisma.deskStageArtifact.deleteMany();
   await prisma.deskJob.deleteMany();
 
-  const dueSoon = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
-  const dueLater = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  const dueSoon = new Date(seedNow.getTime() + 3 * 24 * 60 * 60 * 1000);
+  const dueLater = new Date(seedNow.getTime() + 7 * 24 * 60 * 60 * 1000);
 
   const deskJob1 = await prisma.deskJob.create({
     data: {

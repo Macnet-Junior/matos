@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CONTENT_PLATFORMS } from "./content-platforms";
 
 export const skillStatusSchema = z.enum(["authored", "planned", "missing"]);
 export const reviewGateSchema = z.enum(["Cold", "Warm", "Hot"]);
@@ -215,21 +216,14 @@ export const advanceGateSchema = z.object({
 });
 
 
-export const deskChannelSchema = z.enum([
-  "x",
-  "linkedin",
-  "newsletter",
-  "blog",
-  "instagram",
-  "youtube",
-]);
+export const deskChannelSchema = z.enum(CONTENT_PLATFORMS);
 
 export const createDeskBriefSchema = z.object({
   title: z.string().trim().min(2).max(120).optional(),
   topic: z.string().trim().min(2).max(240),
   audience: z.string().trim().min(2).max(240),
   offerCta: z.string().trim().min(2).max(240),
-  channels: z.array(deskChannelSchema).min(1).max(6),
+  channels: z.array(deskChannelSchema).min(1).max(CONTENT_PLATFORMS.length),
   dueAt: z.string().datetime().optional().nullable(),
 });
 

@@ -26,6 +26,7 @@ const ops = [
   { href: "/ops/presence", label: "Presence" },
   { href: "/ops/usage", label: "Usage" },
   { href: "/ops/billing", label: "Billing" },
+  { href: "/ops/content", label: "Content" },
   { href: "/ops/auto-response", label: "Auto-response" },
 ];
 

@@ -8,6 +8,7 @@ import {
   consumptionForPeriod,
   estimateUsd,
   latestBalance,
+  stripeBillingGate,
 } from "@/lib/ops/billing";
 import { BillingGrantForm } from "@/components/ops/BillingGrantForm";
 
@@ -19,6 +20,7 @@ export default async function Page() {
   const since = new Date(Date.now() - 30 * 86_400_000);
   const balance = await latestBalance(WORKSPACE_USER_ID);
   const period = await consumptionForPeriod(since);
+  const stripe = stripeBillingGate();
   const ledger = await prisma.creditLedger.findMany({
     where: { userId: WORKSPACE_USER_ID },
     orderBy: { createdAt: "desc" },
@@ -32,10 +34,10 @@ export default async function Page() {
           <h1 className="text-base font-semibold tracking-tight">
             Charges & consumption
           </h1>
-          <Badge tone="muted">Stripe connect — Phase 4b later</Badge>
+          <Badge tone="muted">Stripe disabled</Badge>
         </div>
         <p className="mt-1.5 max-w-xl text-xs text-matos-muted">
-          Stub credit ledger + pricing table. No live Stripe charges.
+          {stripe.reason} Credit ledger stays local. No card charges run from MatOS.
         </p>
       </div>
       <div className="grid gap-4 overflow-auto p-[22px] lg:grid-cols-3">
