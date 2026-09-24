@@ -31,9 +31,13 @@ jobs:
           pnpm seed
       - name: Lint
         run: pnpm lint
+      - name: Lint Skillwright
+        run: pnpm --filter skillwright lint
       - name: Typecheck
         run: pnpm typecheck
       - name: Test
         env:
           DATABASE_URL: file:${{ github.workspace }}/packages/db/prisma/ci.db
         run: pnpm test
+      - name: Test Skillwright
+        run: pnpm --filter skillwright test

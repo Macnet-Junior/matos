@@ -21,6 +21,7 @@ Aesthetic: Linear / Raycast–class precision dark UI. No purple gradients.
 
 ```
 apps/web          Next.js App Router + Auth.js + map UI + APIs
+apps/skillwright  Agent Skills desk (SKILL.md editor) on :43123
 packages/db       Prisma schema, migrations, seed (SQLite)
 packages/ui       Citron tokens, Button, Panel, Badge
 docs/             BRIEF, SECURITY, LAUNCH, ADRs, ops/
@@ -96,7 +97,8 @@ Isolated tests use `packages/db/prisma/.test/suite.db` and do not open the devel
 
 | Command | Description |
 |---|---|
-| `pnpm dev` | Start Next.js on :3000 |
+| `pnpm dev` | Start the Desk Next.js app on :3000 |
+| `pnpm dev:skillwright` | Start the Skillwright skills desk on :43123 |
 | `pnpm lint` | ESLint |
 | `pnpm typecheck` | TypeScript strict |
 | `pnpm test` | Vitest on the isolated SQLite suite (never `dev.db`) |
