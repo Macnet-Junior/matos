@@ -6,15 +6,12 @@ import { useRouter } from "next/navigation";
 import { Badge, Button } from "@matos/ui";
 import { DESK_STAGES, STAGE_BLURBS, STAGE_LABELS, type DeskStage } from "@/lib/desk/stages";
 import type { DeskJobDTO } from "@/lib/desk";
+import {
+  CONTENT_PLATFORM_DEFINITIONS,
+  CONTENT_PLATFORMS,
+} from "@/lib/content-platforms";
 
-const CHANNELS = [
-  "x",
-  "linkedin",
-  "newsletter",
-  "blog",
-  "instagram",
-  "youtube",
-] as const;
+const CHANNELS = CONTENT_PLATFORMS;
 
 function statusTone(
   status: string,
@@ -177,7 +174,7 @@ export function DeskBoard({
                           : "border-matos-border text-matos-muted hover:text-matos-text"
                       }`}
                     >
-                      {ch}
+                      {CONTENT_PLATFORM_DEFINITIONS[ch].label}
                     </button>
                   );
                 })}

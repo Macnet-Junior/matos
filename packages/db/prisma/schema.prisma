@@ -374,6 +374,7 @@ model DeskJob {
   artifacts    DeskStageArtifact[]
   calendarItems DeskCalendarItem[]
   inboxItems   DeskInboxItem[]
+  publications DeskPublication[]
 
   @@index([stage])
   @@index([status])
@@ -437,4 +438,49 @@ model DeskInboxItem {
   @@index([jobId])
   @@index([status])
   @@index([createdAt])
+}
+
+/// Content delivery attempt for an approved Desk job.
+model DeskPublication {
+  id             String   @id @default(cuid())
+  jobId          String
+  job            DeskJob  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  channel        String
+  provider       String
+  idempotencyKey String   @unique
+  externalId     String?
+  /// planned | publishing | published | failed
+  status         String   @default("planned")
+  scheduledAt    DateTime?
+  publishedAt    DateTime?
+  attemptCount   Int      @default(0)
+  lastAttemptAt  DateTime?
+  error          String?
+  /// Provider response and non-secret delivery metadata.
+  metaJson       String   @default("{}")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  metrics        ContentMetric[]
+
+  @@unique([jobId, channel])
+  @@index([status])
+  @@index([channel])
+  @@index([scheduledAt])
+}
+
+/// Measured outcome for a published content item.
+model ContentMetric {
+  id            String         @id @default(cuid())
+  publicationId String
+  publication   DeskPublication @relation(fields: [publicationId], references: [id], onDelete: Cascade)
+  kind          String
+  value         Float
+  capturedAt    DateTime       @default(now())
+  /// Provider-specific period, post, or import metadata.
+  metaJson      String         @default("{}")
+  createdAt     DateTime       @default(now())
+
+  @@index([publicationId])
+  @@index([kind])
+  @@index([capturedAt])
 }
