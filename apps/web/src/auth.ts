@@ -1,5 +1,6 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import { authorizeMatosPassword } from "@/lib/auth-credentials";
 import { resolveRole } from "@/lib/rbac";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -14,7 +15,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       async authorize(credentials) {
         const email = String(credentials?.email ?? "").trim().toLowerCase();
         const password = String(credentials?.password ?? "");
-        if (!email || password !== "dev") {
+        if (!email || !authorizeMatosPassword(password)) {
           return null;
         }
         const name =

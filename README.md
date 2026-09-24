@@ -81,7 +81,9 @@ pnpm --filter @matos/db studio
 
 ### Relay Desk (Phase 5.5)
 
-Sidebar **Desk** → Desk / Calendar / Inbox. Six gated stages (Scout→Echo), Library desk archive. Placeholder LLM without `OPENAI_API_KEY`. **No live publish.** Details: [`docs/DESK.md`](docs/DESK.md).
+Sidebar **Desk** → Desk / Calendar / Inbox. Six gated stages (Scout→Echo), Library desk archive. Placeholder LLM without `OPENAI_API_KEY`. Publishing requires Desk approval; simulated fallbacks stay labeled. Details: [`docs/DESK.md`](docs/DESK.md).
+
+Isolated tests use `packages/db/prisma/.test/suite.db` and do not open the development database. See [`docs/ops/HOSTED_DEPLOY.md`](docs/ops/HOSTED_DEPLOY.md).
 
 ### Ops & Support (Phase 5)
 
@@ -97,7 +99,8 @@ Sidebar **Desk** → Desk / Calendar / Inbox. Six gated stages (Scout→Echo), L
 | `pnpm dev` | Start Next.js on :3000 |
 | `pnpm lint` | ESLint |
 | `pnpm typecheck` | TypeScript strict |
-| `pnpm test` | Vitest |
+| `pnpm test` | Vitest on the isolated SQLite suite (never `dev.db`) |
+| `pnpm test:isolated` | Same isolated full suite. Documented command for CI and Windows. |
 | `pnpm build` | Production build |
 | `pnpm db:migrate` | Apply Prisma migrations |
 | `pnpm db:seed` | Seed departments, skills, workflows, roles |

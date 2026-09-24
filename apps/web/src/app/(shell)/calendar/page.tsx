@@ -10,7 +10,7 @@ export default async function Page() {
       <div className="border-b border-matos-soft px-[22px] py-4">
         <h1 className="text-base font-semibold tracking-tight">Calendar</h1>
         <p className="mt-1.5 max-w-xl text-xs text-matos-muted">
-          Desk schedule board for Press packs. Publishing stays offline.
+          Desk schedule board for Press packs. Simulation is labeled and is not a live post.
         </p>
       </div>
       <DeskCalendar items={items} />

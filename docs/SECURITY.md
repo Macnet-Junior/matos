@@ -22,7 +22,8 @@
 - Dev logins: `macnet@matos.local` → **Owner** (also via `OWNER_EMAIL`); seeded `operator@`, `author@`, `viewer@matos.local`.
 - Roles enforced on mutating APIs: Owner full CRUD; Operator run+approve; Author skill edit; Viewer read-only.
 - Sessions are JWT via Auth.js; `AUTH_SECRET` signs tokens.
-- This credentials path is intentionally weak and must **not** ship as production auth without replacing the provider.
+- Local development still accepts password `dev`.
+- Production (`NODE_ENV=production`) rejects `dev` and placeholder secrets. It requires `AUTH_SECRET` and `MATOS_AUTH_PASSWORD` from the host secret manager. See `docs/ops/SECRET_ROTATION.md`.
 
 ## CSRF (cookie / session note)
 

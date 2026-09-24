@@ -1,7 +1,24 @@
 import { prisma } from "@matos/db";
 import { appendActivity } from "@/lib/map-data";
 
-/** Stub pricing table — Stripe connect Phase 4b later (still deferred). */
+/**
+ * Live Stripe stays off until credit accounting and reconciliation are
+ * production-ready and covered by tests. Do not charge cards from this module.
+ */
+export const STRIPE_BILLING_ENABLED = false as const;
+
+export function stripeBillingGate(): {
+  enabled: false;
+  reason: string;
+} {
+  return {
+    enabled: STRIPE_BILLING_ENABLED,
+    reason:
+      "Billing waits for production credit reconciliation. Live Stripe is not enabled.",
+  };
+}
+
+/** Stub pricing table — display only. No Stripe client is constructed. */
 export const CREDIT_PRICING = {
   /** USD per credit unit (display only) */
   usdPerCredit: 0.02,

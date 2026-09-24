@@ -208,7 +208,44 @@ export class EtsyClient {
       error?: string;
     };
     if (!res.ok) {
-      throw new Error(data.error ?? `Etsy create listing failed (${res.status})`);
+      throw new Error(res.status >= 500 || res.status === 429 ? "provider_unavailable" : "provider_error");
+    }
+    return { listing_id: data.listing_id };
+  }
+
+  /**
+   * Publish a listing only after an explicit Desk approval.
+   * Without an access token the result stays a simulated draft.
+   */
+  async publishApprovedListing(
+    shopId: string | number,
+    input: EtsyDraftListingInput,
+    opts: { reviewGateApproved: boolean },
+  ): Promise<{ listing_id?: string | number; simulated?: boolean }> {
+    if (!opts.reviewGateApproved) {
+      throw new Error("approval_required");
+    }
+    if (!this.accessToken) {
+      return simulateEtsyDraft(input);
+    }
+    const res = await this.fetchImpl(
+      `${this.apiBase}/application/shops/${shopId}/listings`,
+      {
+        method: "POST",
+        headers: {
+          ...this.headers(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...input,
+          type: "physical",
+          state: "active",
+        }),
+      },
+    );
+    const data = (await res.json().catch(() => ({}))) as { listing_id?: number };
+    if (!res.ok) {
+      throw new Error(res.status >= 500 || res.status === 429 ? "provider_unavailable" : "provider_error");
     }
     return { listing_id: data.listing_id };
   }
@@ -228,6 +265,60 @@ export function simulateEtsyDraft(input: EtsyDraftListingInput) {
     simulated: true as const,
     title: input.title,
   };
+}
+
+/**
+ * ContentPublisher adapter. Live activation requires Desk approval.
+ * Missing tokens stay on the simulated draft path.
+ */
+export class EtsyContentPublisher {
+  constructor(
+    private readonly deps: {
+      client: EtsyClient;
+      shopId: string | number;
+    },
+  ) {}
+
+  async publish(input: {
+    channel: string;
+    body: string;
+    title?: string;
+    idempotencyKey: string;
+    approved?: boolean;
+  }): Promise<{
+    externalId: string;
+    status: "planned" | "published";
+    simulated: boolean;
+    scheduledFor?: string | null;
+    meta?: Record<string, unknown>;
+  }> {
+    if (input.channel !== "etsy") throw new Error("provider_error");
+    if (!input.approved) throw new Error("approval_required");
+    try {
+      const result = await this.deps.client.publishApprovedListing(
+        this.deps.shopId,
+        {
+          title: (input.title ?? "MatOS listing").slice(0, 140),
+          description: input.body,
+        },
+        { reviewGateApproved: true },
+      );
+      const externalId = result.listing_id ? String(result.listing_id) : "";
+      if (!externalId) throw new Error("provider_error");
+      const simulated = Boolean(result.simulated);
+      return {
+        externalId,
+        status: simulated ? "planned" : "published",
+        simulated,
+        meta: { provider: "etsy", deliveryStatus: simulated ? "draft" : "published" },
+      };
+    } catch (error) {
+      if (error instanceof Error && error.message === "approval_required") throw error;
+      const message = error instanceof Error ? error.message : "provider_error";
+      if (message === "provider_unavailable" || message === "provider_timeout") throw error;
+      throw new Error("provider_error");
+    }
+  }
 }
 
 /** Map etsy-listing-lab skill fields into a draft listing payload. */

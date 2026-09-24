@@ -1,7 +1,7 @@
 # Relay Desk (Phase 5.5)
 
 Desk is the MatOS **newsroom** mode: brief → six gated stages → calendar packs → inbox reply drafts.  
-It is separate from **Workflows** (company skill automations). Desk does **not** live-publish to Late.dev, WhatsApp, Etsy, GHL, ads, or voice.
+It is separate from **Workflows** (company skill automations). Desk never publishes without approval. Provider failures fall back to a result that stays marked simulated and is not a live post. WhatsApp still sends only to `WHATSAPP_GROUP_OR_TO`.
 
 ## Stages
 

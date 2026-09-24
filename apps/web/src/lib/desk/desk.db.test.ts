@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "@matos/db";
+import { assertIsolatedTestDatabase, cleanupDeskFixtures } from "@/test/db-fixtures";
 import {
   actOnInboxItem,
   createDeskJob,
@@ -11,6 +12,15 @@ import {
 } from "./index";
 
 describe("desk pipeline (db)", () => {
+  beforeAll(async () => {
+    assertIsolatedTestDatabase();
+    await cleanupDeskFixtures();
+  });
+
+  afterAll(async () => {
+    await cleanupDeskFixtures();
+  });
+
   it("seeds sample desk jobs", async () => {
     const jobs = await listDeskJobs();
     expect(jobs.length).toBeGreaterThanOrEqual(2);
@@ -105,6 +115,11 @@ describe("desk pipeline (db)", () => {
     });
     expect(filed.stage).toBe("filed");
     expect(filed.calendarItems.length).toBe(2);
+    const xPack = filed.calendarItems.find((item) => item.channel === "x");
+    const linkedinPack = filed.calendarItems.find((item) => item.channel === "linkedin");
+    expect(xPack?.body).toMatch(/gated desk/i);
+    expect(linkedinPack?.body).toMatch(/Operators drown/i);
+    expect(xPack?.body).not.toMatch(/Scheduled pack/i);
     expect(filed.inboxItems.length).toBeGreaterThanOrEqual(1);
     expect(filed.inboxItems.every((i) => i.status === "drafted")).toBe(true);
 
@@ -149,5 +164,7 @@ describe("desk pipeline (db)", () => {
     });
     expect(edited.artifacts[0]?.body).toContain("Human override");
     expect(edited.status).toBe("awaiting_approval");
+    expect(edited.artifacts[0]?.revisions.length).toBeGreaterThanOrEqual(1);
+    expect(edited.artifacts[0]?.revisions[0]?.body).not.toContain("Human override");
   });
 });

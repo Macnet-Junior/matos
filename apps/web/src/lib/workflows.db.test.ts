@@ -1,5 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "@matos/db";
+import {
+  assertIsolatedTestDatabase,
+  cleanupWorkflowRunFixtures,
+} from "@/test/db-fixtures";
 import {
   canAdvanceGate,
   executeDryRun,
@@ -9,6 +13,15 @@ import {
 } from "./workflows";
 
 describe("workflow dry-run engine (db)", () => {
+  beforeAll(async () => {
+    assertIsolatedTestDatabase();
+    await cleanupWorkflowRunFixtures();
+  });
+
+  afterAll(async () => {
+    await cleanupWorkflowRunFixtures();
+  });
+
   it("lists seeded workflows", async () => {
     const workflows = await listWorkflows();
     expect(workflows.length).toBeGreaterThanOrEqual(2);

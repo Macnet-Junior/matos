@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireDeskApprove } from "@/lib/owner";
+import { clientSafeError } from "@/lib/client-safe-error";
 import { publishDeskCalendarItem } from "@/lib/content-publications";
 
 export async function POST(
@@ -19,7 +20,6 @@ export async function POST(
     });
     return NextResponse.json({ publication });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Publish failed";
-    return NextResponse.json({ error: message }, { status: 400 });
+    return NextResponse.json({ error: clientSafeError(error, "Publish failed") }, { status: 400 });
   }
 }

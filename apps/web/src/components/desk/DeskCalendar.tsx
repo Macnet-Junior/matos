@@ -17,9 +17,9 @@ export function DeskCalendar({ items }: { items: DeskCalendarItemDTO[] }) {
   return (
     <div className="flex flex-1 flex-col gap-3 overflow-auto p-[22px]">
       <p className="max-w-xl text-xs text-matos-muted">
-        Scheduled Press packs from Clock-approved Desk jobs. Status stays{" "}
-        <span className="text-matos-text">planned / ready</span> — no live
-        publish in Phase 5.5.
+        Scheduled Press packs from Clock-approved Desk jobs. A{" "}
+        <span className="text-matos-text">simulated</span> badge is not a live
+        publication. Live delivery still requires Desk approval.
       </p>
       {days.length === 0 ? (
         <div className="rounded-xl border border-matos-border bg-matos-panel p-6 text-sm text-matos-muted">
@@ -50,13 +50,18 @@ export function DeskCalendar({ items }: { items: DeskCalendarItemDTO[] }) {
                     <div className="mt-1 text-[11px] text-matos-muted">
                       {item.channel}
                       {item.jobTitle ? ` · ${item.jobTitle}` : ""}
+                      {item.publicationStatus
+                        ? ` · publication ${item.publicationStatus}`
+                        : ""}
                     </div>
                     <p className="mt-1 max-w-xl text-[11px] text-matos-muted2">
                       {item.body}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge tone="muted">{item.status}</Badge>
+                    <Badge tone={item.simulated ? "danger" : "muted"}>
+                      {item.simulated ? "simulated — not live" : item.status}
+                    </Badge>
                     <Link
                       href={`/desk/${item.jobId}`}
                       className="text-[11px] text-matos-citron"

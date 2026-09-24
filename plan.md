@@ -201,47 +201,47 @@ Plan 5.6 - Add privacy retention controls, export, deletion, and audit review to
 
 ### Phase 1: Test and database foundations
 
-- [ ] T001 [Plan:1.1] Update `apps/web/src/lib/knowledge.test.ts` to compare normalized platform paths on Windows.
-- [ ] T002 [P] [Plan:1.2] Add isolated SQLite database setup for `apps/web/src/lib/desk/desk.db.test.ts`.
-- [ ] T003 [P] [Plan:1.2] Add isolated SQLite database setup for `apps/web/src/lib/workflows.db.test.ts`.
-- [ ] T004 [Plan:1.3] Add deterministic seed and cleanup helpers for database-backed tests.
-- [ ] T005 [Plan:1.4] Run the full test suite against an isolated test database and document the command.
+- [x] T001 [Plan:1.1] Update `apps/web/src/lib/knowledge.test.ts` to compare normalized platform paths on Windows.
+- [x] T002 [P] [Plan:1.2] Add isolated SQLite database setup for `apps/web/src/lib/desk/desk.db.test.ts`.
+- [x] T003 [P] [Plan:1.2] Add isolated SQLite database setup for `apps/web/src/lib/workflows.db.test.ts`.
+- [x] T004 [Plan:1.3] Add deterministic seed and cleanup helpers for database-backed tests.
+- [x] T005 [Plan:1.4] Run the full test suite against an isolated test database and document the command.
 
 ### Phase 2: Editorial content engine
 
-- [ ] T006 [Plan:2.1] Extract channel-specific Press content from `apps/web/src/lib/desk/index.ts` when Clock materializes calendar items.
-- [ ] T007 [P] [Plan:2.2] Add structured content-package types to `apps/web/src/lib/content-platforms.ts`.
-- [ ] T008 [Plan:2.2] Persist structured package metadata through `DeskStageArtifact` or a dedicated package model.
-- [ ] T009 [P] [Plan:2.3] Add platform capability and length validation tests.
-- [ ] T010 [Plan:2.4] Add Desk artifact revision persistence and revision DTOs.
-- [ ] T011 [Plan:2.5] Display publication status and simulation state in `apps/web/src/components/desk/DeskCalendar.tsx`.
+- [x] T006 [Plan:2.1] Extract channel-specific Press content from `apps/web/src/lib/desk/index.ts` when Clock materializes calendar items.
+- [x] T007 [P] [Plan:2.2] Add structured content-package types to `apps/web/src/lib/content-platforms.ts`.
+- [x] T008 [Plan:2.2] Persist structured package metadata through `DeskStageArtifact` or a dedicated package model.
+- [x] T009 [P] [Plan:2.3] Add platform capability and length validation tests.
+- [x] T010 [Plan:2.4] Add Desk artifact revision persistence and revision DTOs.
+- [x] T011 [Plan:2.5] Display publication status and simulation state in `apps/web/src/components/desk/DeskCalendar.tsx`.
 
 ### Phase 3: Publishing adapters
 
-- [ ] T012 [Plan:3.1] Add Late/Zernio account mapping tests for all supported social destinations.
-- [ ] T013 [Plan:3.2] Add newsletter publisher interface and local implementation.
-- [ ] T014 [Plan:3.3] Add blog publisher interface and local implementation.
-- [ ] T015 [Plan:3.4] Adapt `apps/web/src/lib/integrations/etsy.ts` to the shared `ContentPublisher` contract.
-- [ ] T016 [Plan:3.5] Adapt `apps/web/src/lib/integrations/whatsapp.ts` to the shared `ContentPublisher` contract.
-- [ ] T017 [Plan:3.6] Add bounded retry and exponential backoff around transient provider errors.
-- [ ] T018 [Plan:3.7] Add delivery reconciliation for asynchronous provider results.
+- [x] T012 [Plan:3.1] Add Late/Zernio account mapping tests for all supported social destinations.
+- [x] T013 [Plan:3.2] Add newsletter publisher interface and local implementation.
+- [x] T014 [Plan:3.3] Add blog publisher interface and local implementation.
+- [x] T015 [Plan:3.4] Adapt `apps/web/src/lib/integrations/etsy.ts` to the shared `ContentPublisher` contract.
+- [x] T016 [Plan:3.5] Adapt `apps/web/src/lib/integrations/whatsapp.ts` to the shared `ContentPublisher` contract.
+- [x] T017 [Plan:3.6] Add bounded retry and exponential backoff around transient provider errors.
+- [x] T018 [Plan:3.7] Add delivery reconciliation for asynchronous provider results.
 
 ### Phase 4: Metrics and learning loop
 
-- [ ] T019 [Plan:4.1] Add authenticated metric ingestion API for `ContentMetric`.
-- [ ] T020 [P] [Plan:4.2] Add CSV or JSON metric import with validation and privacy limits.
-- [ ] T021 [Plan:4.3] Add publication performance view to Ops.
-- [ ] T022 [Plan:4.4] Add aggregate content performance summaries.
-- [ ] T023 [Plan:4.5] Add reviewed performance insight links to skills and knowledge.
+- [x] T019 [Plan:4.1] Add authenticated metric ingestion API for `ContentMetric`.
+- [x] T020 [P] [Plan:4.2] Add CSV or JSON metric import with validation and privacy limits.
+- [x] T021 [Plan:4.3] Add publication performance view to Ops.
+- [x] T022 [Plan:4.4] Add aggregate content performance summaries.
+- [x] T023 [Plan:4.5] Add reviewed performance insight links to skills and knowledge.
 
 ### Phase 5: Production readiness
 
-- [ ] T024 [Plan:5.1] Replace development credentials with production authentication.
-- [ ] T025 [P] [Plan:5.3] Add production secret management and rotation documentation.
-- [ ] T026 [Plan:5.5] Add provider health, delivery, and fallback observability.
-- [ ] T027 [Plan:5.6] Add privacy retention, export, and deletion controls.
-- [ ] T028 [Plan:5.2] Add hosted deployment configuration and production migration checks.
-- [ ] T029 [Plan:5.4] Implement Stripe only after production credit reconciliation is specified and tested.
+- [x] T024 [Plan:5.1] Replace development credentials with production authentication.
+- [x] T025 [P] [Plan:5.3] Add production secret management and rotation documentation.
+- [x] T026 [Plan:5.5] Add provider health, delivery, and fallback observability.
+- [x] T027 [Plan:5.6] Add privacy retention, export, and deletion controls.
+- [x] T028 [Plan:5.2] Add hosted deployment configuration and production migration checks.
+- [x] T029 [Plan:5.4] Implement Stripe only after production credit reconciliation is specified and tested.
 
 ## Requirement Mapping
 

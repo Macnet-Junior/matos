@@ -9,6 +9,7 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:isolated": "vitest run",
     "test:watch": "vitest",
     "audit": "pnpm audit --prod",
     "db:seed": "pnpm --filter @matos/db seed"
