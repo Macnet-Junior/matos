@@ -1,13 +1,17 @@
-import { prisma } from "@matos/db";
+import { assertIsolatedDatabaseUrl, prisma } from "@matos/db";
 
 const SEEDED_DESK_JOBS = ["desk-job-seed-1", "desk-job-seed-2"];
 
-/** Refuse any database that is not the isolated suite file. */
+/**
+ * Refuse any database that is not the isolated suite file.
+ *
+ * The same invariant is enforced when the Prisma client is constructed (see
+ * packages/db/src/index.ts), so a test that never calls this helper is still
+ * protected. Kept as a callable wrapper so cleanup functions can fail loudly
+ * and self-documentingly before they delete anything.
+ */
 export function assertIsolatedTestDatabase(): void {
-  const url = (process.env.DATABASE_URL ?? "").replace(/\\/g, "/");
-  if (!url.includes("/.test/suite.db") || url.includes("dev.db")) {
-    throw new Error("Refusing to run database tests outside the isolated suite database");
-  }
+  assertIsolatedDatabaseUrl(process.env.DATABASE_URL);
 }
 
 export async function cleanupDeskFixtures(): Promise<void> {

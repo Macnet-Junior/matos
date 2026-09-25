@@ -4,6 +4,30 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
+/**
+ * Vitest sets MATOS_TEST_DB in every test process (apps/web/vitest.config.ts).
+ * A test process that reaches for anything other than the isolated suite
+ * database is a bug in the wiring, not a warning: it would silently read and
+ * write the developer's real data, and the damage is invisible because the
+ * test still passes. Refuse to construct a client at all.
+ *
+ * The check lives here rather than in a test helper because helpers are
+ * opt-in — a test that forgets to call one must still be safe.
+ */
+export function assertIsolatedDatabaseUrl(url: string | undefined): void {
+  const normalized = (url ?? "").replace(/\\/g, "/");
+  if (!normalized.includes("/.test/suite.db") || normalized.includes("dev.db")) {
+    throw new Error(
+      `Refusing to open ${normalized || "(unset DATABASE_URL)"} from a test process: ` +
+        `MATOS_TEST_DB=isolated requires the suite database at packages/db/prisma/.test/suite.db`,
+    );
+  }
+}
+
+if (process.env.MATOS_TEST_DB === "isolated") {
+  assertIsolatedDatabaseUrl(process.env.DATABASE_URL);
+}
+
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
