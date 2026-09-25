@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { Badge } from "@matos/ui";
-import { listFiledDeskJobs } from "@/lib/desk";
+import { getSessionFlags } from "@/lib/owner";
+import { deskOwner, listFiledDeskJobs } from "@/lib/desk";
 
 export const dynamic = "force-dynamic";
 
 export default async function Page() {
-  const jobs = await listFiledDeskJobs();
+  const flags = await getSessionFlags();
+  const jobs = await listFiledDeskJobs(deskOwner(flags.email));
   return (
     <main className="flex flex-1 flex-col bg-matos-bg">
       <div className="border-b border-matos-soft px-[22px] py-4">

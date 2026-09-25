@@ -1,12 +1,12 @@
 import { getSessionFlags } from "@/lib/owner";
-import { listDeskJobs } from "@/lib/desk";
+import { deskOwner, listDeskJobs } from "@/lib/desk";
 import { DeskBoard } from "@/components/desk/DeskBoard";
 
 export const dynamic = "force-dynamic";
 
 export default async function Page() {
   const flags = await getSessionFlags();
-  const jobs = await listDeskJobs();
+  const jobs = await listDeskJobs(deskOwner(flags.email));
 
   return (
     <main className="flex flex-1 flex-col overflow-auto bg-matos-bg">

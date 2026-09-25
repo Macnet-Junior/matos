@@ -3,9 +3,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { cleanupDeskFixtures } from "@/test/db-fixtures";
 import {
   createDeskJob,
+  deskOwner,
   getDeskJob,
   listCalendarItems,
   listDeskJobs,
+  listInboxItems,
   runDeskStage,
 } from "./index";
 
@@ -79,23 +81,44 @@ describe("per-owner isolation", () => {
   });
 
   /**
-   * This is the finding, not a passing assertion. `listDeskJobs` takes no
-   * actor and filters only by stage, so an unfiltered view returns every
-   * owner's work. The test documents the current behaviour; when the list
-   * functions grow an owner scope, this expectation flips to `[]` and the
-   * suite becomes the regression guard for the fix.
+   * The regression guard for the leak this suite originally found.
+   *
+   * The list functions used to take no actor and filter only by stage, so a
+   * signed-in user saw every owner's work. They now require an owner and
+   * return nothing without one. Both halves are asserted here: the scope
+   * actually narrows the result, and a missing actor fails closed rather than
+   * unfiltered.
    */
-  it("currently leaks across owners through the unscoped list functions", async () => {
-    const all = await listDeskJobs();
-    const ids = all.map((j) => j.id);
-    expect(ids).toContain(jobA.id);
-    expect(ids).toContain(jobB.id);
+  it("returns only the requesting owner's jobs, and nothing without an owner", async () => {
+    const asA = await listDeskJobs(deskOwner(OWNER_A));
+    const asB = await listDeskJobs(deskOwner(OWNER_B));
 
-    const calendar = await listCalendarItems();
-    const jobIds = new Set(calendar.map((c) => c.jobId));
-    // No calendar items yet (nothing past Clock), but the query itself is
-    // unscoped — it filters by nothing but scheduledAt ordering.
-    expect([...jobIds].every((id) => id === jobA.id || id === jobB.id)).toBe(true);
+    expect(asA.map((j) => j.id)).toEqual([jobA.id]);
+    expect(asB.map((j) => j.id)).toEqual([jobB.id]);
+
+    // Fail closed: no actor means no rows, never every row.
+    expect(await listDeskJobs(null)).toEqual([]);
+    expect(await listCalendarItems(null)).toEqual([]);
+    expect(await listInboxItems(null)).toEqual([]);
+  });
+
+  it("scopes calendar and inbox rows through the job that owns them", async () => {
+    // Nothing has reached Clock yet, so both collections are empty — but the
+    // assertion that matters is the shape of the failure: asking as owner B
+    // must never surface a row reachable only through owner A's job.
+    const calendarB = await listCalendarItems(deskOwner(OWNER_B));
+    const inboxB = await listInboxItems(deskOwner(OWNER_B));
+
+    expect(calendarB.every((c) => c.jobId === jobB.id)).toBe(true);
+    expect(inboxB.every((i) => i.jobId === jobB.id)).toBe(true);
+  });
+
+  it("treats a differently-cased or padded owner as the same account", async () => {
+    // Session emails arrive in whatever case the identity provider sends.
+    // resolveRole normalises before comparing, and so must the scope, or an
+    // owner signs in as "Owner A" and finds an empty desk.
+    const asA = await listDeskJobs(deskOwner(`  ${OWNER_A.toUpperCase()}  `));
+    expect(asA.map((j) => j.id)).toEqual([jobA.id]);
   });
 
   it("scopes a single job fetch to exactly one owner's row", async () => {

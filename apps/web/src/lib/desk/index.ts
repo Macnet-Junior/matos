@@ -285,21 +285,53 @@ const jobInclude = {
   inboxItems: true,
 } as const;
 
-export async function listDeskJobs(opts?: {
-  filedOnly?: boolean;
-}): Promise<DeskJobDTO[]> {
+/**
+ * The owner a read is scoped to — the load-bearing argument of every list
+ * function below.
+ *
+ * MatOS separates brains per user, and separation is only real if it happens
+ * in the query. A list function that takes no owner and filters later in the
+ * page is one refactor away from showing a customer someone else's work, and
+ * nothing in the type system would have objected. So the actor is explicit and
+ * required, the same rule the brain loader follows: `userId` comes first, and
+ * an absent actor returns nothing rather than everything.
+ *
+ * Typed as a branded string on purpose — a bare `string` would accept a job id
+ * or a topic compiled in by a future caller and quietly widen the scope.
+ */
+export type DeskOwner = string & { readonly __deskOwner: unique symbol };
+
+export function deskOwner(email: string | null | undefined): DeskOwner | null {
+  const normalized = email?.trim().toLowerCase();
+  return (normalized ? normalized : null) as DeskOwner | null;
+}
+
+export async function listDeskJobs(
+  owner: DeskOwner | null,
+  opts?: { filedOnly?: boolean },
+): Promise<DeskJobDTO[]> {
+  // No actor, no rows. An unauthenticated read must come back empty, never
+  // unfiltered — the failure mode of "forgot to pass the scope" has to be a
+  // blank screen, not a data breach.
+  if (!owner) return [];
+
   const rows = await prisma.deskJob.findMany({
-    where: opts?.filedOnly
-      ? { stage: "filed" }
-      : { NOT: { stage: "filed" } },
+    where: {
+      createdBy: owner,
+      ...(opts?.filedOnly
+        ? { stage: "filed" }
+        : { NOT: { stage: "filed" } }),
+    },
     include: jobInclude,
     orderBy: { updatedAt: "desc" },
   });
   return rows.map(toDeskJobDTO);
 }
 
-export async function listFiledDeskJobs(): Promise<DeskJobDTO[]> {
-  return listDeskJobs({ filedOnly: true });
+export async function listFiledDeskJobs(
+  owner: DeskOwner | null,
+): Promise<DeskJobDTO[]> {
+  return listDeskJobs(owner, { filedOnly: true });
 }
 
 export async function getDeskJob(id: string): Promise<DeskJobDTO | null> {
@@ -760,8 +792,16 @@ export async function reviewDeskStage(input: {
   return toDeskJobDTO(updated);
 }
 
-export async function listCalendarItems(): Promise<DeskCalendarItemDTO[]> {
+export async function listCalendarItems(
+  owner: DeskOwner | null,
+): Promise<DeskCalendarItemDTO[]> {
+  if (!owner) return [];
+
   const rows = await prisma.deskCalendarItem.findMany({
+    // Scope through the parent job: calendar items carry no creator of their
+    // own, so the owner filter has to reach across the relation. A job the
+    // owner did not create takes its calendar items with it.
+    where: { job: { createdBy: owner } },
     include: { job: { select: { title: true } } },
     orderBy: { scheduledAt: "asc" },
   });
@@ -793,8 +833,15 @@ export async function listCalendarItems(): Promise<DeskCalendarItemDTO[]> {
   });
 }
 
-export async function listInboxItems(): Promise<DeskInboxItemDTO[]> {
+export async function listInboxItems(
+  owner: DeskOwner | null,
+): Promise<DeskInboxItemDTO[]> {
+  if (!owner) return [];
+
   const rows = await prisma.deskInboxItem.findMany({
+    // Same relation-scoped rule as the calendar: reply drafts belong to
+    // whoever owns the job they were drafted for.
+    where: { job: { createdBy: owner } },
     include: { job: { select: { title: true } } },
     orderBy: { createdAt: "desc" },
   });

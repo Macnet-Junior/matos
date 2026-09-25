@@ -1,10 +1,12 @@
-import { listCalendarItems } from "@/lib/desk";
+import { getSessionFlags } from "@/lib/owner";
+import { deskOwner, listCalendarItems } from "@/lib/desk";
 import { DeskCalendar } from "@/components/desk/DeskCalendar";
 
 export const dynamic = "force-dynamic";
 
 export default async function Page() {
-  const items = await listCalendarItems();
+  const flags = await getSessionFlags();
+  const items = await listCalendarItems(deskOwner(flags.email));
   return (
     <main className="flex flex-1 flex-col overflow-hidden bg-matos-bg">
       <div className="border-b border-matos-soft px-[22px] py-4">

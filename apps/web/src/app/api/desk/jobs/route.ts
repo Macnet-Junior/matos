@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { requireDeskRun } from "@/lib/owner";
 import { createDeskBriefSchema } from "@/lib/validation";
-import { createDeskJob, listDeskJobs, listFiledDeskJobs } from "@/lib/desk";
+import { createDeskJob, deskOwner, listDeskJobs, listFiledDeskJobs } from "@/lib/desk";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +13,10 @@ export async function GET(req: Request) {
   }
   const url = new URL(req.url);
   const filed = url.searchParams.get("filed") === "1";
-  const jobs = filed ? await listFiledDeskJobs() : await listDeskJobs();
+  const owner = deskOwner(session.user.email);
+  const jobs = filed
+    ? await listFiledDeskJobs(owner)
+    : await listDeskJobs(owner);
   return NextResponse.json({ jobs });
 }
 

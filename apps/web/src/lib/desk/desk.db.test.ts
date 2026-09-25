@@ -4,6 +4,7 @@ import { assertIsolatedTestDatabase, cleanupDeskFixtures } from "@/test/db-fixtu
 import {
   actOnInboxItem,
   createDeskJob,
+  deskOwner,
   listCalendarItems,
   listDeskJobs,
   reviewDeskStage,
@@ -22,7 +23,15 @@ describe("desk pipeline (db)", () => {
   });
 
   it("seeds sample desk jobs", async () => {
-    const jobs = await listDeskJobs();
+    // The list is scoped now, so a seed assertion has to name whose desk it
+    // reads. The two seeded jobs have different authors on purpose (see
+    // packages/db/prisma/seed.ts) — reading one owner's desk proves the scope
+    // narrows, and reading both proves the seed is still complete.
+    const mine = await listDeskJobs(deskOwner("macnet@matos.local"));
+    const theirs = await listDeskJobs(deskOwner("author@matos.local"));
+    const jobs = [...mine, ...theirs];
+
+    expect(mine).toHaveLength(1);
     expect(jobs.length).toBeGreaterThanOrEqual(2);
     const titles = jobs.map((j) => j.title);
     expect(titles.some((t) => t.includes("ICP") || t.includes("Warm"))).toBe(
@@ -123,7 +132,10 @@ describe("desk pipeline (db)", () => {
     expect(filed.inboxItems.length).toBeGreaterThanOrEqual(1);
     expect(filed.inboxItems.every((i) => i.status === "drafted")).toBe(true);
 
-    const cal = await listCalendarItems();
+    // The job on this path was created as macnet@matos.local, and a calendar
+    // row is only reachable through the job that owns it — asking as any other
+    // owner returns nothing, which is the isolation rule working.
+    const cal = await listCalendarItems(deskOwner("macnet@matos.local"));
     expect(cal.some((c) => c.jobId === job.id)).toBe(true);
 
     const inboxId = filed.inboxItems[0]!.id;

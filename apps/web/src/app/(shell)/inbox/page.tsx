@@ -1,12 +1,12 @@
 import { getSessionFlags } from "@/lib/owner";
-import { listInboxItems } from "@/lib/desk";
+import { deskOwner, listInboxItems } from "@/lib/desk";
 import { DeskInbox } from "@/components/desk/DeskInbox";
 
 export const dynamic = "force-dynamic";
 
 export default async function Page() {
   const flags = await getSessionFlags();
-  const items = await listInboxItems();
+  const items = await listInboxItems(deskOwner(flags.email));
   return (
     <main className="flex flex-1 flex-col overflow-hidden bg-matos-bg">
       <div className="border-b border-matos-soft px-[22px] py-4">
