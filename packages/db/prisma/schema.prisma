@@ -375,11 +375,53 @@ model DeskJob {
   calendarItems DeskCalendarItem[]
   inboxItems   DeskInboxItem[]
   publications DeskPublication[]
+  sources      DeskSource[]
 
   @@index([stage])
   @@index([status])
   @@index([createdAt])
   @@index([filedAt])
+}
+
+/// A piece of the owner's own material — a video, a call, an article — that the
+/// desk can be briefed from.
+///
+/// The transcript is stored verbatim rather than summarised at ingest time,
+/// because the point of a source is provenance: a claim in a draft has to stay
+/// checkable against the sentence it came from. Summarising on the way in
+/// throws away the only thing that makes the draft provable.
+///
+/// `jobId` is nullable — material is often ingested before there is a job to
+/// put it in, and a source that can only exist inside a job cannot be
+/// collected ahead of time.
+model DeskSource {
+  id           String   @id @default(cuid())
+  jobId        String?
+  /// video | audio | article | doc | call
+  kind         String
+  title        String
+  /// URL, file path, or a human description of where this came from.
+  origin       String
+  /// pending | transcribed | failed
+  status       String   @default("pending")
+  /// Which engine produced the transcript. "placeholder" means none did.
+  provider     String   @default("")
+  language     String?
+  durationMs   Int?
+  /// Rendered transcript, with [mm:ss] timestamps. Empty until transcribed.
+  transcript   String   @default("")
+  /// JSON array of {startMs, endMs, text}
+  segmentsJson String   @default("[]")
+  error        String?
+  createdBy    String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  job          DeskJob? @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  @@index([createdBy])
+  @@index([jobId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model DeskStageArtifact {
