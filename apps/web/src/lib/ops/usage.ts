@@ -53,6 +53,60 @@ export type UsageSummary = {
   count: number;
 };
 
+/**
+ * A calendar month in UTC, as a half-open interval [start, end).
+ *
+ * Half-open because the alternative double-counts the boundary: a run at
+ * exactly midnight on the 1st would belong to both months, or to neither,
+ * depending on which comparison the caller wrote. This form has one rule and
+ * no edge case.
+ */
+export function monthWindowInclusive(now: Date = new Date()): {
+  start: Date;
+  end: Date;
+} {
+  const start = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0),
+  );
+  const end = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0),
+  );
+  return { start, end };
+}
+
+/**
+ * Count desk runs in a window, by counting the events that were written when
+ * the runs happened.
+ *
+ * Units, not rows: `recordUsageEvent` is called once per stage with
+ * `units: 1`, but nothing stops a future caller batching a whole pipeline
+ * into one row with `units: 6`. Counting rows would let that pass the cap for
+ * free, so the allowance is measured in the same unit it is charged in.
+ *
+ * This is the deliberate choice behind "runs per month": a run is one
+ * countable thing the *user* did, not a token count they cannot reason about,
+ * and it is measured from the ledger rather than kept in a second counter
+ * that would drift from it. No mutable counter, nothing to reset on the 1st,
+ * no way for the number the user sees to disagree with the number we recorded.
+ */
+export async function countDeskRuns(input: {
+  userId: string;
+  since: Date;
+  until?: Date;
+}): Promise<number> {
+  const rows = await prisma.usageEvent.findMany({
+    where: {
+      userId: input.userId,
+      kind: "ai_credit",
+      createdAt: input.until
+        ? { gte: input.since, lt: input.until }
+        : { gte: input.since },
+    },
+    select: { units: true },
+  });
+  return rows.reduce((total, row) => total + row.units, 0);
+}
+
 export async function summarizeUsage(opts?: {
   since?: Date;
   userId?: string;
