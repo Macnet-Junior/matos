@@ -16,10 +16,24 @@ export type DeskGenerateInput = {
   priorArtifacts: { stage: string; title: string; body: string }[];
 };
 
+/**
+ * Token accounting for one generation.
+ *
+ * The pricing rule for MatOS is that a tier's price is derived from what the
+ * tier grants, so cost has to be measured per run rather than assumed. Left
+ * undefined when the provider does not report usage — unknown is not zero, and
+ * a price grid built on missing numbers is a guess wearing a number's clothes.
+ */
+export type DeskUsage = {
+  promptTokens: number;
+  completionTokens: number;
+};
+
 export type DeskGenerateResult = {
   title: string;
   body: string;
   meta: Record<string, unknown>;
+  usage?: DeskUsage;
 };
 
 export interface DeskLlmProvider {
@@ -243,13 +257,20 @@ export class OpenAiDeskProvider implements DeskLlmProvider {
       if (!res.ok) return this.fallback.generate(input);
       const data = (await res.json()) as {
         choices?: { message?: { content?: string } }[];
+        usage?: { prompt_tokens?: number; completion_tokens?: number };
       };
       const body = data.choices?.[0]?.message?.content?.trim();
       if (!body) return this.fallback.generate(input);
+      const promptTokens = data.usage?.prompt_tokens;
+      const completionTokens = data.usage?.completion_tokens;
       return {
         title: `${STAGE_LABELS[input.stage]} — ${input.brief.topic}`,
         body,
         meta: { provider: "openai", stage: input.stage },
+        usage:
+          typeof promptTokens === "number" && typeof completionTokens === "number"
+            ? { promptTokens, completionTokens }
+            : undefined,
       };
     } catch {
       return this.fallback.generate(input);

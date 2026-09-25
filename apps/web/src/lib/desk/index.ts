@@ -456,6 +456,16 @@ export async function runDeskStage(input: {
       stage,
       jobId: job.id,
       provider: generated.meta.provider,
+      // Cost of the run, measured rather than assumed. MatOS prices a tier by
+      // what the tier grants, so this is the number the price grid is built
+      // from. Absent for providers that report no usage — a missing figure
+      // must stay missing rather than be recorded as zero.
+      ...(generated.usage
+        ? {
+            promptTokens: generated.usage.promptTokens,
+            completionTokens: generated.usage.completionTokens,
+          }
+        : {}),
     },
   });
 
