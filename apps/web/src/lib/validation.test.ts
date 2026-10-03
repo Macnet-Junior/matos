@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { parseEvidenceLinks } from "@matos/db";
 import {
   createDepartmentSchema,
+  createDeskSourceSchema,
   createSkillSchema,
+  ingestDeskSourceSchema,
   skillPackageItemSchema,
   skillsPackageSchema,
   updateSkillSchema,
@@ -153,5 +155,84 @@ describe("parseEvidenceLinks", () => {
       { url: "https://a.test", label: "A" },
       { url: "legacy-note", label: "legacy-note" },
     ]);
+  });
+});
+
+describe("desk source schemas", () => {
+  it("accepts a source with a loose origin", () => {
+    // The origin is a URL for a video, a path for an upload, or the owner's
+    // own description of a call. All three have to survive validation, because
+    // rejecting a free-form origin pushes the owner to invent a URL for
+    // material that has none.
+    for (const origin of [
+      "https://youtube.test/watch?v=abc",
+      "workspace/media/call.m4a",
+      "a pricing call with Dana, recorded on my phone",
+    ]) {
+      const parsed = createDeskSourceSchema.safeParse({
+        kind: "call",
+        title: "Pricing call",
+        origin,
+      });
+      expect(parsed.success).toBe(true);
+    }
+  });
+
+  it("refuses an unknown kind rather than defaulting it", () => {
+    // A kind that silently became "doc" would file a video under the wrong
+    // shape and the mistake would only surface at transcription time.
+    const parsed = createDeskSourceSchema.safeParse({
+      kind: "podcast",
+      title: "Not a kind",
+      origin: "somewhere",
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it("requires a non-empty title and origin", () => {
+    expect(
+      createDeskSourceSchema.safeParse({
+        kind: "video",
+        title: "",
+        origin: "workspace/media/a.mp4",
+      }).success,
+    ).toBe(false);
+    expect(
+      createDeskSourceSchema.safeParse({
+        kind: "video",
+        title: "A talk",
+        origin: "   ",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("accepts a null jobId and rejects a blank one", () => {
+    // Null is the common case — material is collected before there is a job.
+    expect(
+      createDeskSourceSchema.safeParse({
+        kind: "article",
+        title: "Standalone",
+        origin: "https://blog.test/post",
+        jobId: null,
+      }).success,
+    ).toBe(true);
+    expect(
+      createDeskSourceSchema.safeParse({
+        kind: "article",
+        title: "Standalone",
+        origin: "https://blog.test/post",
+        jobId: "",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("requires a file path for ingest", () => {
+    expect(
+      ingestDeskSourceSchema.safeParse({ filePath: "/media/talk.mp4" }).success,
+    ).toBe(true);
+    expect(ingestDeskSourceSchema.safeParse({}).success).toBe(false);
+    expect(ingestDeskSourceSchema.safeParse({ filePath: "" }).success).toBe(
+      false,
+    );
   });
 });

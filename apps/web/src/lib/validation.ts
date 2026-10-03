@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { CONTENT_PLATFORMS } from "./content-platforms";
+import { SOURCE_KINDS } from "./desk/sources";
 
 export const skillStatusSchema = z.enum(["authored", "planned", "missing"]);
 export const reviewGateSchema = z.enum(["Cold", "Warm", "Hot"]);
@@ -225,6 +226,24 @@ export const createDeskBriefSchema = z.object({
   offerCta: z.string().trim().min(2).max(240),
   channels: z.array(deskChannelSchema).min(1).max(CONTENT_PLATFORMS.length),
   dueAt: z.string().datetime().optional().nullable(),
+});
+
+export const createDeskSourceSchema = z.object({
+  kind: z.enum(SOURCE_KINDS),
+  title: z.string().trim().min(2).max(160),
+  // The origin is deliberately loose. It is a URL for a video, a path for an
+  // upload, or the owner's own description of where a call came from — the
+  // three cannot share a shape, and rejecting a free-form origin would push
+  // the owner to invent a URL for material that has none.
+  origin: z.string().trim().min(1).max(600),
+  jobId: z.string().trim().min(1).max(64).optional().nullable(),
+});
+
+export const ingestDeskSourceSchema = z.object({
+  // A file path on the machine the desk runs on. The route does not accept a
+  // URL here: fetching a remote file at ingest time is a different decision
+  // (what may the desk reach out to) and is not made by this field.
+  filePath: z.string().trim().min(1).max(600),
 });
 
 export const updateDeskArtifactSchema = z.object({
