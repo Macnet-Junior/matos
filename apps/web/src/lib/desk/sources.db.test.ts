@@ -9,6 +9,7 @@ import {
   listDeskSources,
   renderTranscript,
   sourceBriefMaterial,
+  sourceSegments,
   type TranscriptResult,
   type TranscriptionProvider,
 } from "./sources";
@@ -254,5 +255,55 @@ describe("desk sources (db)", () => {
     });
     expect(rendered).toBe("A short article body.");
     expect(rendered).not.toContain("[00:00]");
+  });
+
+  it("refuses to read segments from a source that produced no speech", async () => {
+    const source = await createDeskSource({
+      kind: "video",
+      title: "Nothing to grade",
+      origin: "workspace/media/silent.mp4",
+      actorEmail: OWNER,
+    });
+
+    // The same gate as `sourceBriefMaterial`, on the same rows, so that a
+    // grader cannot open a second path to a transcript the brief path refuses.
+    expect(await sourceSegments(source.id)).toBeNull();
+
+    await ingestSource({
+      sourceId: source.id,
+      filePath: "/tmp/silent.mp4",
+      actorEmail: OWNER,
+    });
+    expect(await sourceSegments(source.id)).toBeNull();
+  });
+
+  it("hands the grader segments, not the flattened transcript", async () => {
+    const source = await createDeskSource({
+      kind: "video",
+      title: "Graded video",
+      origin: "workspace/media/episode.mp4",
+      actorEmail: OWNER,
+    });
+
+    await ingestSource({
+      sourceId: source.id,
+      filePath: "/tmp/episode.mp4",
+      actorEmail: OWNER,
+      provider: new FakeProvider(),
+    });
+
+    // Prose is what a brief wants; timestamps are what a skill check wants. The
+    // transcript string has already thrown them away, which is why the grade
+    // path reads the segments instead.
+    const material = await sourceSegments(source.id);
+    expect(material).not.toBeNull();
+    expect(material!.segments).toHaveLength(2);
+    expect(material!.segments[0]).toEqual({
+      startMs: 0,
+      endMs: 4_000,
+      text: "We raised the price",
+    });
+    expect(material!.durationMs).toBe(9_500);
+    expect(material!.transcript).toContain("[00:04]");
   });
 });

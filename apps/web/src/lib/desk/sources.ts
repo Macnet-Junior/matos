@@ -357,6 +357,43 @@ export async function sourceBriefMaterial(
 }
 
 /**
+ * The transcript of a source, as segments, for the skill checks to read.
+ *
+ * `sourceBriefMaterial` deliberately returns prose: a brief is a document and
+ * the skills need timestamps, which prose has thrown away. So a caller that
+ * wants to grade reads segments here instead.
+ *
+ * Returns null unless the row is `transcribed` with non-empty text — the same
+ * gate `sourceBriefMaterial` applies, kept in the same place so a future caller
+ * cannot open a second, looser path to the raw column.
+ */
+export async function sourceSegments(
+  sourceId: string,
+): Promise<{
+  title: string;
+  durationMs: number | null;
+  transcript: string;
+  segments: TranscriptSegment[];
+} | null> {
+  const row = await prisma.deskSource.findUnique({ where: { id: sourceId } });
+  if (!row || row.status !== "transcribed") return null;
+  if (!row.transcript.trim()) return null;
+  let segments: TranscriptSegment[] = [];
+  try {
+    const parsed = JSON.parse(row.segmentsJson);
+    if (Array.isArray(parsed)) segments = parsed;
+  } catch {
+    segments = [];
+  }
+  return {
+    title: row.title,
+    durationMs: row.durationMs,
+    transcript: row.transcript,
+    segments,
+  };
+}
+
+/**
  * Sources linked to a job, scoped by owner.
  *
  * Same rule as every other desk read: the owner is the first argument and an

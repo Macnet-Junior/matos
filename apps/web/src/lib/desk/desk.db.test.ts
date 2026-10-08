@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "@matos/db";
 import { assertIsolatedTestDatabase, cleanupDeskFixtures } from "@/test/db-fixtures";
+import { createDeskSource, ingestSource, type TranscriptResult, type TranscriptionProvider } from "./sources";
 import {
   actOnInboxItem,
   createDeskJob,
@@ -11,6 +12,24 @@ import {
   runDeskStage,
   updateDeskArtifact,
 } from "./index";
+
+/** A transcript whose opening is housekeeping, so the hook check fails it. */
+class HousekeepingProvider implements TranscriptionProvider {
+  async transcribe(): Promise<TranscriptResult> {
+    return {
+      text: "Hey guys, welcome back. In this video I explain the topic.",
+      segments: [
+        { startMs: 0, endMs: 3_000, text: "Hey guys, welcome back to the channel." },
+        { startMs: 4_000, endMs: 9_000, text: "Don't forget to subscribe." },
+        { startMs: 40_000, endMs: 46_000, text: "In this video I explain the workflow step by step." },
+        { startMs: 70_000, endMs: 74_000, text: "Here's why the workflow matters." },
+      ],
+      language: "en",
+      durationMs: 120_000,
+      provider: "fake",
+    };
+  }
+}
 
 describe("desk pipeline (db)", () => {
   beforeAll(async () => {
@@ -37,6 +56,60 @@ describe("desk pipeline (db)", () => {
     expect(titles.some((t) => t.includes("ICP") || t.includes("Warm"))).toBe(
       true,
     );
+  });
+
+  it("puts a graded transcript into the scout brief, and nothing when there is none", async () => {
+    const owner = "grader@matos.local";
+
+    // First: a job whose source never produced speech. The scout brief must
+    // come back without a grade block at all — an empty "Nothing graded" header
+    // would read downstream as a video that had been checked and passed.
+    const ungraded = await createDeskJob({
+      topic: "No transcript yet",
+      audience: "Authors",
+      offerCta: "Ingest a source",
+      channels: ["blog"],
+      actorEmail: owner,
+    });
+    const bare = await runDeskStage({ jobId: ungraded.id, actorEmail: owner });
+    expect(bare.artifacts[0]!.body).not.toContain("Transcript grade");
+
+    // Then: the same job, with a real transcript attached. The opening is
+    // housekeeping, so the hook must fail and the failure has to survive all
+    // the way into the artifact the owner reads — not just live in the module.
+    const source = await createDeskSource({
+      kind: "video",
+      title: "Episode 12",
+      origin: "workspace/media/ep12.mp4",
+      jobId: ungraded.id,
+      actorEmail: owner,
+    });
+    await ingestSource({
+      sourceId: source.id,
+      filePath: "/tmp/ep12.mp4",
+      actorEmail: owner,
+      provider: new HousekeepingProvider(),
+    });
+
+    const graded = await prisma.deskJob.update({
+      where: { id: ungraded.id },
+      data: {
+        stage: "scout",
+        status: "draft",
+      },
+    });
+    expect(graded.id).toBe(ungraded.id);
+
+    // Stage back to scout so the same job re-runs with the source now attached.
+    await prisma.deskStageArtifact.deleteMany({ where: { jobId: ungraded.id } });
+    const scouted = await runDeskStage({ jobId: ungraded.id, actorEmail: owner });
+    const body = scouted.artifacts[0]!.body;
+    expect(body).toContain("Transcript grade");
+    // The failing sentence itself, with its timestamp — the thing a draft stage
+    // must not be able to paraphrase away into generic advice.
+    expect(body).toContain("[hook] hook_window_is_housekeeping @ 00:00");
+    expect(body).toContain("Fix first: **hook**");
+    expect(body).toContain("not instructions for the draft below");
   });
 
   it("creates a brief and cannot skip the Scout gate", async () => {

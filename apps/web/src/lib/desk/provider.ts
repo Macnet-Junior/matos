@@ -1,6 +1,20 @@
 import type { DeskStage } from "./stages";
 import { STAGE_LABELS } from "./stages";
 
+/**
+ * A graded transcript, attached to the brief rather than to the artifact.
+ *
+ * The grade belongs in the brief because it is input, not output: it describes
+ * the material the stage is working from, the same way `audience` does. Left
+ * off the type entirely when there was no transcript to grade — an empty string
+ * here would read to a model as "a video that passed".
+ */
+export type DeskBriefGrade = {
+  sourceTitle: string;
+  transcript: string;
+  block: string;
+};
+
 export type DeskBriefInput = {
   title: string;
   topic: string;
@@ -8,6 +22,8 @@ export type DeskBriefInput = {
   offerCta: string;
   channels: string[];
   dueAt: string | null;
+  /** Present only when a linkable source has a transcript on this job. */
+  grade?: DeskBriefGrade;
 };
 
 export type DeskGenerateInput = {
@@ -87,6 +103,7 @@ export class PlaceholderDeskProvider implements DeskLlmProvider {
             `- Internal brand voice / offer ladder`,
             `- Prior Warm-review wins from Workflows`,
             `- Desk dry-run placeholders (no live web scrape in Phase 5.5)`,
+            ...(brief.grade ? ["", brief.grade.block] : []),
           ].join("\n"),
           meta: { provider: "placeholder", stage },
         };

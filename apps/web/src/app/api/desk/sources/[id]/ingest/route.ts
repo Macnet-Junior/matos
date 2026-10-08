@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { ingestSource } from "@/lib/desk/sources";
+import { ingestSource, sourceSegments } from "@/lib/desk/sources";
+import { gradeTranscript, renderGradeForBrief } from "@/lib/skills/grade";
 import { requireDeskRun } from "@/lib/owner";
 import { ingestDeskSourceSchema } from "@/lib/validation";
 
@@ -32,12 +33,28 @@ export async function POST(
       actorEmail: gate.email,
     });
 
+    // Grade only what actually produced speech. `sourceSegments` applies the
+    // same `transcribed` gate the brief path uses, so a `pending` source is
+    // never graded into an empty "Nothing graded" block that could be mistaken
+    // for a result.
+    let grade: ReturnType<typeof renderGradeForBrief> = null;
+    let grading: ReturnType<typeof gradeTranscript> | null = null;
+    if (source.status === "transcribed") {
+      const material = await sourceSegments(source.id);
+      if (material) {
+        grading = gradeTranscript(material.segments, {
+          ...(material.durationMs !== null ? { durationMs: material.durationMs } : {}),
+        });
+        grade = renderGradeForBrief(grading);
+      }
+    }
+
     // The status is returned rather than smoothed over. `pending` here means no
     // provider was configured and no speech was processed — the honest outcome,
     // not a failure to hide. A caller that receives 200 with `pending` and an
     // `error` explanation has been told the truth: the source is not ready to
     // brief from, and `sourceBriefMaterial` will refuse it.
-    return NextResponse.json({ source });
+    return NextResponse.json({ source, grade, grading });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Ingest failed";
     const status = message.includes("not found") ? 404 : 400;

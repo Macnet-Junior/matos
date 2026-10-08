@@ -3,7 +3,10 @@ import { appendActivity } from "@/lib/map-data";
 import { recordUsageEvent } from "@/lib/ops/usage";
 import type { ContentPackage } from "@/lib/content-platforms";
 import { buildChannelPackages } from "./press-packages";
+import type { DeskBriefGrade } from "./provider";
 import { getDeskProvider } from "./provider";
+import { sourceSegments } from "./sources";
+import { gradeTranscript, renderGradeForBrief } from "@/lib/skills/grade";
 import {
   DESK_STAGES,
   STAGE_LABELS,
@@ -399,6 +402,35 @@ export async function createDeskJob(input: {
  * Generate (or regenerate) the artifact for the job's current stage.
  * Cannot run a later stage until the prior artifact is approved.
  */
+/**
+ * Grade a job's transcribed source, if it has one.
+ *
+ * Every stage that runs after a source is ingested works from that source's
+ * transcript, so the grade is computed once here and handed to the brief rather
+ * than being recomputed per stage. A job with no source, or whose source never
+ * produced speech, simply has no grade — the caller must not read that absence
+ * as a pass, which is why the key is omitted rather than set to an empty block.
+ */
+async function gradeJobSource(jobId: string): Promise<DeskBriefGrade | null> {
+  const rows = await prisma.deskSource.findMany({
+    where: { jobId },
+    orderBy: { createdAt: "desc" },
+  });
+  for (const row of rows) {
+    if (row.status !== "transcribed") continue;
+    if (!row.transcript.trim()) continue;
+    const material = await sourceSegments(row.id);
+    if (!material) continue;
+    const grade = gradeTranscript(material.segments, {
+      ...(material.durationMs !== null ? { durationMs: material.durationMs } : {}),
+    });
+    const block = renderGradeForBrief(grade);
+    if (!block) continue;
+    return { sourceTitle: material.title, transcript: material.transcript, block };
+  }
+  return null;
+}
+
 export async function runDeskStage(input: {
   jobId: string;
   actorEmail: string;
@@ -429,6 +461,7 @@ export async function runDeskStage(input: {
 
   const provider = getDeskProvider();
   const channels = parseJsonArray(job.channelsJson);
+  const grade = await gradeJobSource(job.id);
   const generated = await provider.generate({
     stage,
     brief: {
@@ -438,6 +471,7 @@ export async function runDeskStage(input: {
       offerCta: job.offerCta,
       channels,
       dueAt: job.dueAt?.toISOString() ?? null,
+      ...(grade ? { grade } : {}),
     },
     priorArtifacts: job.artifacts.map((a) => ({
       stage: a.stage,
