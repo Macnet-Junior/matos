@@ -55,6 +55,8 @@ export type DeskCalendarItemDTO = {
   scheduledAt: string;
   status: string;
   simulated: boolean;
+  /** True when the body is the brief restated, not an approved channel draft. */
+  fallback: boolean;
   publicationStatus: string | null;
   createdAt: string;
 };
@@ -254,6 +256,10 @@ export function toDeskJobDTO(job: JobWithRelations): DeskJobDTO {
         status: c.status,
         simulated: c.simulated,
         publicationStatus: c.simulated ? "simulated" : c.status,
+        // Same reading as `listCalendarItems`: the row records what it holds.
+        fallback:
+          parseJsonObject(c.packageJson).fallback === true ||
+          c.status === "fallback_brief",
         createdAt: c.createdAt.toISOString(),
       })),
     inboxItems: job.inboxItems
@@ -602,10 +608,18 @@ async function materializeClock(jobId: string, channels: string[], dueAt: Date |
     const channel = channels[i]!;
     const pkg = packages.find((item) => item.channel === channel);
     const when = new Date(base.getTime() + i * 86400000);
+    // A supported channel always has a package, but not always a *draft*: when
+    // Press carried no `## channel` section, `buildChannelPackage` fills the
+    // text with the brief restated. That item would otherwise be marked
+    // `planned` like any other, so a calendar full of briefs looks identical to
+    // a calendar full of drafts. `fallback` records which one it is, and the
+    // status becomes `fallback_brief` — scheduled, but visibly not publishable
+    // as if an approved draft existed.
+    const fallback = Boolean(pkg) && pkg!.text.trim() === briefText(job.topic, job.offerCta);
     const stored = pkg ?? {
       channel,
       title: `${job.title} · ${channel}`,
-      text: `${job.topic}\n\n${job.offerCta}`.trim(),
+      text: briefText(job.topic, job.offerCta),
       links: [] as string[],
       media: [] as ContentPackage["media"],
       hashtags: [] as string[],
@@ -618,12 +632,17 @@ async function materializeClock(jobId: string, channels: string[], dueAt: Date |
         title: stored.title,
         body: stored.text,
         scheduledAt: when,
-        status: validation.ok ? "planned" : "invalid",
-        packageJson: JSON.stringify(stored),
+        status: validation.ok ? (fallback ? "fallback_brief" : "planned") : "invalid",
+        packageJson: JSON.stringify({ ...stored, fallback }),
         simulated: false,
       },
     });
   }
+}
+
+/** The text `buildChannelPackage` falls back to when a channel has no section. */
+function briefText(topic: string, offerCta: string): string {
+  return [topic.trim(), offerCta.trim()].filter(Boolean).join("\n\n");
 }
 
 async function materializeEcho(jobId: string, channels: string[]) {
@@ -817,6 +836,11 @@ export async function listCalendarItems(
       meta.simulated === true ||
       meta.provider === "simulated" ||
       meta.fallback === true;
+    // Read from the stored package, which is where materializeClock wrote it.
+    // Recomputing "is this the brief?" here would drift the moment the brief
+    // shape changes; the row records what it actually holds.
+    const fallback =
+      parseJsonObject(r.packageJson).fallback === true || r.status === "fallback_brief";
     return {
       id: r.id,
       jobId: r.jobId,
@@ -827,6 +851,7 @@ export async function listCalendarItems(
       scheduledAt: r.scheduledAt.toISOString(),
       status: simulated ? "simulated" : r.status,
       simulated,
+      fallback,
       publicationStatus: publication?.status ?? null,
       createdAt: r.createdAt.toISOString(),
     };
