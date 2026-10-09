@@ -192,14 +192,8 @@ export function WorkflowsPanel({
                   </li>
                 ))}
               </ol>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Link
-                  href={`/workflows/${wf.id}`}
-                  className="inline-flex items-center justify-center rounded-lg border border-matos-border bg-matos-panel px-3 py-2 text-xs text-matos-text hover:border-matos-citron"
-                >
-                  Open
-                </Link>
-                {canRunWorkflows ? (
+              {canRunWorkflows ? (
+                <div className="mt-3 flex flex-wrap gap-2">
                   <Button
                     variant="primary"
                     disabled={runningId === wf.id}
@@ -207,8 +201,8 @@ export function WorkflowsPanel({
                   >
                     {runningId === wf.id ? "Running…" : "Dry-run"}
                   </Button>
-                ) : null}
-              </div>
+                </div>
+              ) : null}
             </article>
           ))
         )}

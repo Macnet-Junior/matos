@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Badge, Button } from "@matos/ui";
+import { OverflowMenu } from "@/components/OverflowMenu";
 import type {
   ContentGate,
   SkillDTO,
@@ -164,44 +165,72 @@ export function WorkflowDetail({
           <Badge tone={gateTone(workflow.gateState)}>
             {workflow.gateState}
           </Badge>
-          {canManageWorkflows ? (
-            <Button variant="secondary" onClick={() => setEditing((v) => !v)}>
-              {editing ? "Close editor" : "Edit chain"}
-            </Button>
-          ) : null}
           {canRunWorkflows ? (
             <Button variant="primary" disabled={busy} onClick={dryRun}>
               Dry-run
             </Button>
           ) : null}
           {canApprove && nextGate ? (
-            <Button
-              variant="secondary"
-              disabled={busy}
-              onClick={advanceGate}
-            >
+            <Button variant="secondary" disabled={busy} onClick={advanceGate}>
               Advance → {nextGate}
               {nextGate === "published" ? " (sim)" : ""}
             </Button>
           ) : null}
+          {canManageWorkflows ? (
+            <OverflowMenu
+              items={[
+                {
+                  label: editing ? "Close editor" : "Edit chain",
+                  onSelect: () => setEditing((value) => !value),
+                  disabled: busy,
+                },
+              ]}
+            />
+          ) : null}
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-1.5">
-        {GATE_ORDER.map((g) => (
-          <span
-            key={g}
-            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-              g === workflow.gateState
-                ? "bg-matos-citron text-[#0b0c0e]"
-                : gateIndexPassed(workflow.gateState, g)
-                  ? "bg-[rgba(214,243,31,0.18)] text-matos-text"
-                  : "bg-[#1c2030] text-matos-muted"
-            }`}
-          >
-            {g}
-          </span>
-        ))}
+      <div>
+        <p className="text-[11px] text-matos-muted">
+          Gate · {workflow.gateState} · step {GATE_ORDER.indexOf(workflow.gateState) + 1} of{" "}
+          {GATE_ORDER.length}
+        </p>
+        <ol className="mt-1.5 flex max-w-md gap-1" aria-label="Workflow gate">
+          {GATE_ORDER.map((gate) => {
+            const current = gate === workflow.gateState;
+            const passed = gateIndexPassed(workflow.gateState, gate);
+            return (
+              <li key={gate} className="min-w-0 flex-1">
+                <span
+                  className={`block h-1 rounded-full ${
+                    current || passed ? "bg-matos-citron" : "bg-[#1c2030]"
+                  } ${passed && !current ? "opacity-70" : ""}`}
+                />
+                <span className="sr-only">
+                  {gate}
+                  {current ? " current" : passed ? " passed" : " waiting"}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+        <details className="mt-2">
+          <summary className="cursor-pointer list-none text-[11px] text-matos-muted hover:text-matos-text [&::-webkit-details-marker]:hidden">
+            All gates
+          </summary>
+          <ol className="mt-1.5 space-y-1 text-[11px] text-matos-muted">
+            {GATE_ORDER.map((gate) => (
+              <li key={gate}>
+                {gate}
+                {gate === workflow.gateState
+                  ? " · current"
+                  : gateIndexPassed(workflow.gateState, gate)
+                    ? " · passed"
+                    : ""}
+              </li>
+            ))}
+          </ol>
+        </details>
       </div>
 
       {error ? (

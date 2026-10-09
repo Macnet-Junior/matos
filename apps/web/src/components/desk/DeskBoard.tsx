@@ -10,6 +10,7 @@ import {
   CONTENT_PLATFORM_DEFINITIONS,
   CONTENT_PLATFORMS,
 } from "@/lib/content-platforms";
+import { deskChannelGroups } from "@/lib/ui-choices";
 
 const CHANNELS = CONTENT_PLATFORMS;
 
@@ -159,26 +160,7 @@ export function DeskBoard({
               />
             </label>
             <div className="sm:col-span-2">
-              <div className="text-xs text-matos-muted">Channels</div>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {CHANNELS.map((ch) => {
-                  const on = channels.includes(ch);
-                  return (
-                    <button
-                      key={ch}
-                      type="button"
-                      onClick={() => toggleChannel(ch)}
-                      className={`rounded-full border px-2.5 py-1 text-[11px] ${
-                        on
-                          ? "border-matos-citron bg-[rgba(214,243,31,0.14)] text-matos-text"
-                          : "border-matos-border text-matos-muted hover:text-matos-text"
-                      }`}
-                    >
-                      {CONTENT_PLATFORM_DEFINITIONS[ch].label}
-                    </button>
-                  );
-                })}
-              </div>
+              <ChannelPicker channels={channels} onToggle={toggleChannel} />
             </div>
           </div>
           {error ? (
@@ -250,6 +232,72 @@ export function DeskBoard({
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function ChannelChip({
+  channel,
+  on,
+  onToggle,
+}: {
+  channel: string;
+  on: boolean;
+  onToggle: (channel: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      onClick={() => onToggle(channel)}
+      className={`rounded-full border px-2.5 py-1 text-[11px] ${
+        on
+          ? "border-matos-citron bg-[rgba(214,243,31,0.14)] text-matos-text"
+          : "border-matos-border text-matos-muted hover:text-matos-text"
+      }`}
+    >
+      {CONTENT_PLATFORM_DEFINITIONS[channel as (typeof CHANNELS)[number]].label}
+    </button>
+  );
+}
+
+function ChannelPicker({
+  channels,
+  onToggle,
+}: {
+  channels: string[];
+  onToggle: (channel: string) => void;
+}) {
+  const { quick, more } = deskChannelGroups(CHANNELS);
+  const moreOn = more.filter((channel) => channels.includes(channel)).length;
+  return (
+    <div>
+      <div className="text-xs text-matos-muted">Channels</div>
+      <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="Default channels">
+        {quick.map((channel) => (
+          <ChannelChip
+            key={channel}
+            channel={channel}
+            on={channels.includes(channel)}
+            onToggle={onToggle}
+          />
+        ))}
+      </div>
+      <details className="mt-2">
+        <summary className="cursor-pointer list-none text-[11px] text-matos-muted hover:text-matos-text [&::-webkit-details-marker]:hidden">
+          More channels{moreOn > 0 ? ` (${moreOn} on)` : ""}
+        </summary>
+        <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="More channels">
+          {more.map((channel) => (
+            <ChannelChip
+              key={channel}
+              channel={channel}
+              on={channels.includes(channel)}
+              onToggle={onToggle}
+            />
+          ))}
+        </div>
+      </details>
     </div>
   );
 }

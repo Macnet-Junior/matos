@@ -5,7 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Badge, Button } from "@matos/ui";
 import { DeskSourcesPanel } from "@/components/desk/DeskSourcesPanel";
+import { OverflowMenu, type OverflowItem } from "@/components/OverflowMenu";
 import { DESK_STAGES, STAGE_LABELS, type DeskStage } from "@/lib/desk/stages";
+import { deskJobActionLayout, deskStageHeadline, type DeskActionId } from "@/lib/ui-choices";
 import type { DeskJobDTO } from "@/lib/desk";
 
 export function DeskJobDetail({
@@ -101,6 +103,36 @@ export function DeskJobDetail({
     }
   }
 
+  const dirty = Boolean(artifact) && body !== (artifact?.body ?? "");
+  const canReview = Boolean(
+    canApprove && artifact && artifact.reviewState !== "approved",
+  );
+  const actions = deskJobActionLayout({
+    canRun,
+    canReview,
+    hasArtifact: Boolean(artifact),
+    dirty,
+  });
+  const actionRun: Record<DeskActionId, () => void> = {
+    run: () => void runStage(),
+    save: () => void saveArtifact(),
+    approve: () => void review("approve"),
+    request_changes: () => void review("request_changes"),
+    regenerate: () => void runStage(),
+  };
+  const actionLabel: Record<DeskActionId, string> = {
+    run: "Run stage",
+    save: "Save edits",
+    approve: "Approve → next stage",
+    request_changes: "Request changes",
+    regenerate: "Regenerate",
+  };
+  const overflow: OverflowItem[] = actions.more.map((id) => ({
+    label: actionLabel[id],
+    onSelect: actionRun[id],
+    disabled: busy || (id === "approve" && artifact?.reviewState === "pending"),
+  }));
+
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <div className="border-b border-matos-soft px-[22px] py-4">
@@ -127,32 +159,47 @@ export function DeskJobDetail({
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-1.5">
-          {DESK_STAGES.map((s) => {
-            const art = job.artifacts.find((a) => a.stage === s);
-            const active = job.stage === s;
-            const approved = art?.reviewState === "approved";
-            return (
-              <div
-                key={s}
-                className={`rounded-lg border px-2.5 py-1.5 text-[11px] ${
-                  active
-                    ? "border-matos-citron bg-[rgba(214,243,31,0.14)] text-matos-text"
-                    : approved
-                      ? "border-matos-border text-matos-text"
-                      : "border-matos-soft text-matos-muted2"
-                }`}
-              >
-                {STAGE_LABELS[s]}
-                {approved ? " ✓" : active ? " ·" : ""}
-              </div>
-            );
-          })}
-          {job.stage === "filed" ? (
-            <div className="rounded-lg border border-matos-citron bg-[rgba(214,243,31,0.14)] px-2.5 py-1.5 text-[11px]">
-              Filed
-            </div>
-          ) : null}
+        <div className="mt-4 max-w-xl">
+          <p className="text-[11px] text-matos-muted">{deskStageHeadline(job.stage)}</p>
+          <ol className="mt-1.5 flex gap-1" aria-label={deskStageHeadline(job.stage)}>
+            {DESK_STAGES.map((stage) => {
+              const art = job.artifacts.find((item) => item.stage === stage);
+              const current = job.stage === stage;
+              const approved = art?.reviewState === "approved";
+              const state = current ? "current" : approved ? "approved" : "waiting";
+              return (
+                <li key={stage} className="min-w-0 flex-1">
+                  <span
+                    className={`block h-1 rounded-full ${
+                      state === "waiting" ? "bg-matos-soft" : "bg-matos-citron"
+                    } ${current ? "" : approved ? "opacity-70" : ""}`}
+                  />
+                  <span className="sr-only">
+                    {STAGE_LABELS[stage]} {state}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+          <details className="mt-2">
+            <summary className="cursor-pointer list-none text-[11px] text-matos-muted hover:text-matos-text [&::-webkit-details-marker]:hidden">
+              All stages
+            </summary>
+            <ol className="mt-1.5 space-y-1 text-[11px] text-matos-muted">
+              {DESK_STAGES.map((stage) => {
+                const art = job.artifacts.find((item) => item.stage === stage);
+                const current = job.stage === stage;
+                const approved = art?.reviewState === "approved";
+                const state = current ? "current" : approved ? "approved" : "waiting";
+                return (
+                  <li key={stage}>
+                    {STAGE_LABELS[stage]} · {state}
+                  </li>
+                );
+              })}
+              {job.stage === "filed" ? <li>Filed</li> : null}
+            </ol>
+          </details>
         </div>
       </div>
 
@@ -230,7 +277,6 @@ export function DeskJobDetail({
         </aside>
 
         <section className="flex min-h-0 flex-col overflow-auto p-4">
-          <DeskSourcesPanel jobId={job.id} canRun={canRun} />
           {job.stage === "filed" ? (
             <div className="rounded-xl border border-matos-border bg-matos-panel p-4 text-sm text-matos-muted">
               This job is filed in{" "}
@@ -250,75 +296,75 @@ export function DeskJobDetail({
                   </h2>
                   <p className="text-[11px] text-matos-muted">
                     {artifact
-                      ? `Review: ${artifact.reviewState}`
+                      ? `Review: ${artifact.reviewState}${dirty ? " · unsaved edits" : ""}`
                       : "No artifact yet — run this stage to generate a placeholder (or OpenAI if keyed)."}
                   </p>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {canRun ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  {actions.primary ? (
+                    <Button
+                      type="button"
+                      variant="primary"
+                      disabled={
+                        busy ||
+                        (actions.primary === "approve" && artifact?.reviewState === "pending")
+                      }
+                      onClick={actionRun[actions.primary]}
+                    >
+                      {actionLabel[actions.primary]}
+                    </Button>
+                  ) : null}
+                  {actions.secondary ? (
                     <Button
                       type="button"
                       variant="secondary"
-                      disabled={busy}
-                      onClick={runStage}
+                      disabled={
+                        busy ||
+                        (actions.secondary === "approve" && artifact?.reviewState === "pending")
+                      }
+                      onClick={actionRun[actions.secondary]}
                     >
-                      {artifact ? "Regenerate" : "Run stage"}
+                      {actionLabel[actions.secondary]}
                     </Button>
                   ) : null}
-                  {canRun && artifact ? (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      disabled={busy}
-                      onClick={saveArtifact}
-                    >
-                      Save edits
-                    </Button>
-                  ) : null}
+                  <OverflowMenu items={overflow} />
                 </div>
               </div>
 
+              {canReview ? (
+                <details className="mb-3 rounded-lg border border-matos-border bg-matos-elev px-3 py-2">
+                  <summary className="cursor-pointer list-none text-[11px] text-matos-muted [&::-webkit-details-marker]:hidden">
+                    Add a review note
+                  </summary>
+                  <label className="mt-2 block text-[11px] text-matos-muted" htmlFor="desk-review-note">
+                    Review note
+                    <input
+                      id="desk-review-note"
+                      className="mt-1 w-full rounded-lg border border-matos-border bg-matos-panel px-3 py-2 text-sm text-matos-text"
+                      value={note}
+                      onChange={(e) => setNote(e.target.value)}
+                      placeholder="Optional note for approve or changes"
+                    />
+                  </label>
+                </details>
+              ) : null}
+
               <textarea
-                className="min-h-[320px] w-full flex-1 rounded-xl border border-matos-border bg-matos-panel p-3 font-mono text-[12px] leading-relaxed text-matos-text"
+                aria-label={
+                  currentStage ? `${STAGE_LABELS[currentStage]} artifact` : "Artifact"
+                }
+                className="min-h-[240px] w-full flex-1 rounded-xl border border-matos-border bg-matos-panel p-3 font-mono text-[12px] leading-relaxed text-matos-text"
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
                 readOnly={!canRun || !artifact}
                 placeholder="Run the stage to generate an editable artifact…"
               />
-
-              {canApprove && artifact && artifact.reviewState !== "approved" ? (
-                <div className="mt-3 rounded-xl border border-matos-border bg-matos-elev p-3">
-                  <label className="block text-[11px] text-matos-muted">
-                    Review note
-                    <input
-                      className="mt-1 w-full rounded-lg border border-matos-border bg-matos-panel px-3 py-2 text-sm text-matos-text"
-                      value={note}
-                      onChange={(e) => setNote(e.target.value)}
-                      placeholder="Optional note for approve / changes"
-                    />
-                  </label>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      variant="primary"
-                      disabled={busy || artifact.reviewState === "pending"}
-                      onClick={() => review("approve")}
-                    >
-                      Approve → next stage
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      disabled={busy}
-                      onClick={() => review("request_changes")}
-                    >
-                      Request changes
-                    </Button>
-                  </div>
-                </div>
-              ) : null}
             </>
           )}
+
+          <div className="mt-4">
+            <DeskSourcesPanel jobId={job.id} canRun={canRun} />
+          </div>
 
           {error ? (
             <p className="mt-3 text-xs text-matos-danger">{error}</p>

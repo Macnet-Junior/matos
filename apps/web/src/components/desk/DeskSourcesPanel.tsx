@@ -112,11 +112,10 @@ export function DeskSourcesPanel({
 
   return (
     <div className="mb-4 rounded-xl border border-matos-border bg-matos-panel p-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
+      <div>
         <h2 className="text-sm font-semibold tracking-tight">Sources</h2>
-        <p className="text-[11px] text-matos-muted">
-          Paste a YouTube link. Skillwright asks Gemini to watch the video and draft a skill.
-          The words are graded with the hook, loop, and pillars checks.
+        <p className="mt-0.5 text-[11px] text-matos-muted">
+          Paste a YouTube link. Skillwright asks Gemini to draft a skill and grade the words.
         </p>
       </div>
 
@@ -157,29 +156,34 @@ export function DeskSourcesPanel({
               {busy ? "Working…" : "Turn this video into a skill"}
             </Button>
           </div>
-          <label className="block text-[11px] text-matos-muted">
-            Or paste the transcript
-            <span className="mt-0.5 block text-matos-muted2">
-              Use this when Gemini cannot read the video. Same draft and the same grade.
-              Start a line with [mm:ss] when you have the times.
-            </span>
-            <textarea
-              className="mt-1 min-h-[96px] w-full rounded-lg border border-matos-border bg-matos-elev px-3 py-2 font-mono text-[12px] text-matos-text"
-              value={transcript}
-              onChange={(event) => setTranscript(event.target.value)}
-              placeholder={"[00:00] The first thing I say\n[00:20] The point of the video"}
-            />
-          </label>
-          <div>
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={busy || !transcript.trim()}
-              onClick={() => submit("transcript")}
-            >
-              Use this transcript
-            </Button>
-          </div>
+          <details className="rounded-lg border border-matos-soft px-3 py-2">
+            <summary className="cursor-pointer list-none text-[11px] text-matos-muted hover:text-matos-text [&::-webkit-details-marker]:hidden">
+              Paste a transcript instead
+            </summary>
+            <label className="mt-2 block text-[11px] text-matos-muted">
+              Transcript
+              <span className="mt-0.5 block text-matos-muted2">
+                Same draft and the same grade, for when Gemini cannot read the video.
+                Start a line with [mm:ss] when you have the times. The title above is used if you set one.
+              </span>
+              <textarea
+                className="mt-1 min-h-[96px] w-full rounded-lg border border-matos-border bg-matos-elev px-3 py-2 font-mono text-[12px] text-matos-text"
+                value={transcript}
+                onChange={(event) => setTranscript(event.target.value)}
+                placeholder={"[00:00] The first thing I say\n[00:20] The point of the video"}
+              />
+            </label>
+            <div className="mt-2">
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={busy || !transcript.trim()}
+                onClick={() => submit("transcript")}
+              >
+                Use this transcript
+              </Button>
+            </div>
+          </details>
         </div>
       ) : (
         <p className="mt-2 text-[11px] text-matos-muted">You can read sources. You cannot add one.</p>

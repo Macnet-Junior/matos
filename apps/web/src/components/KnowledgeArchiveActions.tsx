@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@matos/ui";
+import { OverflowMenu } from "@/components/OverflowMenu";
 import { downloadFromResponse } from "./download-response";
 
 export function KnowledgeArchiveActions({ enabled }: { enabled: boolean }) {
@@ -71,20 +71,21 @@ export function KnowledgeArchiveActions({ enabled }: { enabled: boolean }) {
   return (
     <div className="flex flex-col items-end gap-1">
       <div className="flex flex-wrap items-center justify-end gap-2">
-        <Button
-          variant="secondary"
-          disabled={!enabled || busy !== null}
-          onClick={onExport}
-        >
-          {busy === "export" ? "Exporting…" : "Export ZIP"}
-        </Button>
-        <Button
-          variant="secondary"
-          disabled={!enabled || busy !== null}
-          onClick={() => inputRef.current?.click()}
-        >
-          {busy === "import" ? "Importing…" : "Import ZIP"}
-        </Button>
+        <OverflowMenu
+          label={busy === "export" ? "Exporting…" : busy === "import" ? "Importing…" : "Package"}
+          items={[
+            {
+              label: "Export ZIP",
+              onSelect: () => void onExport(),
+              disabled: !enabled || busy !== null,
+            },
+            {
+              label: "Import ZIP",
+              onSelect: () => inputRef.current?.click(),
+              disabled: !enabled || busy !== null,
+            },
+          ]}
+        />
         <input
           ref={inputRef}
           type="file"

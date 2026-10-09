@@ -50,6 +50,7 @@ export function BillingGrantForm({ canManage }: { canManage: boolean }) {
       </h3>
       <div className="flex flex-wrap gap-2">
         <input
+          aria-label="Credits"
           className="w-28 rounded-lg border border-matos-border bg-matos-bg px-2 py-1.5 text-xs"
           value={units}
           onChange={(e) => setUnits(e.target.value)}
@@ -57,6 +58,7 @@ export function BillingGrantForm({ canManage }: { canManage: boolean }) {
           step="1"
         />
         <input
+          aria-label="Note"
           className="min-w-[160px] flex-1 rounded-lg border border-matos-border bg-matos-bg px-2 py-1.5 text-xs"
           value={note}
           onChange={(e) => setNote(e.target.value)}

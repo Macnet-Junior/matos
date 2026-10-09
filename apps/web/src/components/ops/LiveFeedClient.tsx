@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { moreFeedFilters, pinnedFeedFilters } from "@/lib/ui-choices";
 
 type Event = {
   id: string;
@@ -12,22 +13,14 @@ type Event = {
   createdAt: string;
 };
 
-const FILTERS = [
-  { id: "", label: "All" },
-  { id: "auth", label: "Logins" },
-  { id: "usage", label: "Usage" },
-  { id: "workflow", label: "Workflows" },
-  { id: "support", label: "Support" },
-  { id: "auto-response", label: "Auto-response" },
-  { id: "credit", label: "Credits" },
-  { id: "whatsapp", label: "WhatsApp" },
-  { id: "publish", label: "Publish" },
-];
-
 export function LiveFeedClient({ initial }: { initial: Event[] }) {
   const [events, setEvents] = useState(initial);
   const [filter, setFilter] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const moreRef = useRef<HTMLDetailsElement>(null);
+  const pinned = pinnedFeedFilters();
+  const more = moreFeedFilters();
+  const moreActive = more.find((item) => item.id === filter);
 
   const load = useCallback(async (type: string) => {
     try {
@@ -56,21 +49,54 @@ export function LiveFeedClient({ initial }: { initial: Event[] }) {
 
   return (
     <div className="flex flex-1 flex-col">
-      <div className="flex flex-wrap gap-1.5 border-b border-matos-soft px-[22px] py-3">
-        {FILTERS.map((f) => (
-          <button
-            key={f.id || "all"}
-            type="button"
-            onClick={() => setFilter(f.id)}
-            className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors ${
-              filter === f.id
-                ? "bg-matos-citron text-[#0b0c0e]"
-                : "bg-[#1c2030] text-matos-muted hover:text-matos-text"
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center gap-1.5 border-b border-matos-soft px-[22px] py-3">
+        <span className="sr-only" id="feed-filter-label">
+          Filter the feed
+        </span>
+        <div className="flex flex-wrap gap-1.5" role="group" aria-labelledby="feed-filter-label">
+          {pinned.map((item) => (
+            <button
+              key={item.id || "all"}
+              type="button"
+              aria-pressed={filter === item.id}
+              onClick={() => setFilter(item.id)}
+              className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                filter === item.id
+                  ? "bg-matos-citron text-[#0b0c0e]"
+                  : "bg-[#1c2030] text-matos-muted hover:text-matos-text"
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+          <details ref={moreRef} className="relative">
+            <summary
+              className={`cursor-pointer list-none rounded-full px-2.5 py-1 text-[11px] font-semibold [&::-webkit-details-marker]:hidden ${
+                moreActive
+                  ? "bg-matos-citron text-[#0b0c0e]"
+                  : "bg-[#1c2030] text-matos-muted hover:text-matos-text"
+              }`}
+            >
+              {moreActive ? moreActive.label : "More"}
+            </summary>
+            <div className="absolute left-0 z-20 mt-1 min-w-[10rem] rounded-lg border border-matos-border bg-matos-elev p-1 shadow-lg">
+              {more.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  aria-pressed={filter === item.id}
+                  className="block w-full rounded-md px-2.5 py-1.5 text-left text-[11px] text-matos-text hover:bg-[#1a1d27]"
+                  onClick={() => {
+                    setFilter(item.id);
+                    if (moreRef.current) moreRef.current.open = false;
+                  }}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </details>
+        </div>
         <span className="ml-auto self-center text-[10px] text-matos-muted2">
           Poll · 4s{error ? ` · ${error}` : ""}
         </span>

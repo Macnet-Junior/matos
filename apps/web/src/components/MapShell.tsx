@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@matos/ui";
+import { OverflowMenu } from "@/components/OverflowMenu";
 import type { DepartmentDTO, MapPayload, SkillDTO } from "@/lib/types";
 import { CompanyMap } from "./CompanyMap";
 import { DetailPanel, type Selection } from "./DetailPanel";
@@ -273,23 +274,7 @@ export function MapShell({ initial }: { initial: MapPayload }) {
               </span>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {map.capabilities.canManageMap && (
-              <Button
-                variant="ghost"
-                onClick={() => setDeptModal({ mode: "create" })}
-              >
-                New department
-              </Button>
-            )}
-            <Button
-              variant="secondary"
-              onClick={onAutoArrange}
-              disabled={busy || !map.capabilities.canManageMap}
-              title={map.capabilities.canManageMap ? "Deterministic layout + persist" : "Owner only"}
-            >
-              Auto arrange
-            </Button>
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="primary"
               onClick={() => setSkillModal({ mode: "create" })}
@@ -298,6 +283,23 @@ export function MapShell({ initial }: { initial: MapPayload }) {
             >
               New skill
             </Button>
+            <OverflowMenu
+              items={[
+                ...(map.capabilities.canManageMap
+                  ? [
+                      {
+                        label: "New department",
+                        onSelect: () => setDeptModal({ mode: "create" }),
+                      },
+                    ]
+                  : []),
+                {
+                  label: "Auto arrange",
+                  onSelect: () => void onAutoArrange(),
+                  disabled: busy || !map.capabilities.canManageMap,
+                },
+              ]}
+            />
           </div>
         </div>
 

@@ -9,7 +9,13 @@ import {
   Trash2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -290,6 +296,16 @@ export function SkillStudio() {
             <Download />
             Download folder
           </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger className={buttonVariants({ variant: "outline" })}>
+              More
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => removeDraft(draft.id)}>
+                Delete this draft
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </header>
 
@@ -584,15 +600,6 @@ export function SkillStudio() {
               ) : null}
             </div>
 
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => removeDraft(draft.id)}
-            >
-              <Trash2 />
-              Delete this draft
-            </Button>
           </div>
         </section>
 
@@ -604,21 +611,25 @@ export function SkillStudio() {
             <span className="text-xs text-muted-foreground">
               {bodyLines} lines · ~{bodyTokens} tokens
             </span>
-            {SNIPPETS.map((snippet) => (
-              <Button
-                key={snippet.label}
-                type="button"
-                size="xs"
-                variant="outline"
-                onClick={() =>
-                  update({
-                    body: `${draft.body.replace(/\s*$/, "")}\n\n${snippet.markdown}`,
-                  })
-                }
-              >
-                {snippet.label}
-              </Button>
-            ))}
+            <DropdownMenu>
+              <DropdownMenuTrigger className={buttonVariants({ variant: "outline", size: "xs" })}>
+                Insert
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {SNIPPETS.map((snippet) => (
+                  <DropdownMenuItem
+                    key={snippet.label}
+                    onClick={() =>
+                      update({
+                        body: `${draft.body.replace(/\s*$/, "")}\n\n${snippet.markdown}`,
+                      })
+                    }
+                  >
+                    {snippet.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
           <Textarea
             aria-label="Skill instructions"
