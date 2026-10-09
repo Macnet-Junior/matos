@@ -2,12 +2,15 @@
   "name": "skillwright",
   "version": "0.1.0",
   "private": true,
+  "exports": {
+    "./youtube-skill": "./src/lib/youtube-skill.ts"
+  },
   "scripts": {
     "dev": "next dev --port 43123",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test src/lib/skill.test.ts"
+    "test": "tsx --test src/lib/skill.test.ts src/lib/youtube-skill.test.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

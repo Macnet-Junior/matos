@@ -95,6 +95,9 @@ importers:
       react-markdown:
         specifier: ^10.1.0
         version: 10.1.0(@types/react@19.2.18)(react@19.2.8)
+      skillwright:
+        specifier: workspace:*
+        version: link:../skillwright
       zod:
         specifier: ^3.24.2
         version: 3.25.76

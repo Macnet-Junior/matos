@@ -38,6 +38,8 @@ Prisma: `UserPresence`, `UsageEvent`, `CreditLedger`, `AutoResponseRule`, `AutoR
 Newsroom mode inside the web app: `/desk`, `/calendar`, `/inbox`, Library desk archive.
 Six gated stages (Scout→Echo), placeholder LLM, no live publish. See `docs/DESK.md`.
 
+A desk job can take a YouTube link or a pasted transcript. Skillwright calls Gemini with the user’s `GEMINI_API_KEY` (Google bills that key). The result is a draft skill plus the existing hook / loop / pillars grade. A failed call stays retryable and is not a watched skill. No Stripe charge for this.
+
 ### Still deferred
 
 - Live Stripe charges  

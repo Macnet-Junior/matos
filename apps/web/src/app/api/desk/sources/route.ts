@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { deskOwner } from "@/lib/desk";
 import { createDeskSource, listDeskSources } from "@/lib/desk/sources";
+import { attachSourceGrades } from "@/lib/desk/youtube-source";
 import { requireDeskRun } from "@/lib/owner";
+import { MISSING_GEMINI_KEY_MESSAGE, geminiConfigured } from "skillwright/youtube-skill";
 import { createDeskSourceSchema } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
@@ -16,8 +18,17 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const jobId = url.searchParams.get("jobId") ?? undefined;
   const owner = deskOwner(session.user.email);
-  const sources = await listDeskSources(owner, jobId ? { jobId } : undefined);
-  return NextResponse.json({ sources });
+  const sources = await attachSourceGrades(
+    await listDeskSources(owner, jobId ? { jobId } : undefined),
+  );
+  const configured = geminiConfigured();
+  return NextResponse.json({
+    sources,
+    gemini: {
+      configured,
+      message: configured ? null : MISSING_GEMINI_KEY_MESSAGE,
+    },
+  });
 }
 
 export async function POST(req: Request) {
