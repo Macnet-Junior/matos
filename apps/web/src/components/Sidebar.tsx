@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import {
   PINNED_NAV,
+  WORKSPACE_NAV,
   navItemActive,
   visibleNavGroups,
   type NavGroup,
@@ -87,13 +88,17 @@ export function Sidebar() {
         </div>
       </div>
 
-      <nav aria-label="Main" className="flex flex-col gap-0.5">
-        {PINNED_NAV.map((item) => (
-          <NavLink key={item.href} {...item} />
-        ))}
-      </nav>
-
       <div className="flex flex-col gap-1">
+        <NavGroupSection group={WORKSPACE_NAV} pathname={pathname} />
+
+        {/* The daily loop. Not a group, because a group is something you open
+            occasionally and this is what the product is for. */}
+        <nav aria-label="Main" className="mt-1 flex flex-col gap-0.5">
+          {PINNED_NAV.map((item) => (
+            <NavLink key={item.href} {...item} />
+          ))}
+        </nav>
+
         {groups.map((group) => (
           <NavGroupSection key={group.id} group={group} pathname={pathname} />
         ))}
