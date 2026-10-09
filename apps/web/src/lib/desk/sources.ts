@@ -41,10 +41,12 @@ export function isSourceKind(v: string): v is SourceKind {
  * A transcript that failed is `failed` and can be retried. A transcript that
  * has not run yet is `pending`, and a brief must never be built from it — an
  * empty transcript is the most dangerous kind, because it produces a
- * confident draft with nothing behind it.
+ * confident draft with nothing behind it. `processing` means a read is in
+ * flight (a YouTube draft, for example) and is not ready to brief from either.
  */
 export const SOURCE_STATUSES = [
   "pending",
+  "processing",
   "transcribed",
   "failed",
 ] as const;
@@ -159,6 +161,11 @@ export type DeskSourceDTO = {
   durationMs: number | null;
   transcript: string;
   segmentCount: number;
+  skillName: string;
+  /** SKILL.md for a draft. Empty unless readiness is draft. */
+  skillDraft: string;
+  /** unfinished | draft. Never watched or approved. */
+  skillReadiness: "unfinished" | "draft";
   error: string | null;
   createdBy: string;
   createdAt: string;
@@ -177,6 +184,10 @@ type SourceRow = {
   durationMs: number | null;
   transcript: string;
   segmentsJson: string;
+  inputText: string;
+  skillDraft: string;
+  skillName: string;
+  skillReadiness: string;
   error: string | null;
   createdBy: string;
   createdAt: Date;
@@ -209,6 +220,9 @@ export function toDeskSourceDTO(row: SourceRow): DeskSourceDTO {
     durationMs: row.durationMs,
     transcript: row.transcript,
     segmentCount: segments.length,
+    skillName: row.skillName,
+    skillDraft: row.skillReadiness === "draft" ? row.skillDraft : "",
+    skillReadiness: row.skillReadiness === "draft" ? "draft" : "unfinished",
     error: row.error,
     createdBy: row.createdBy,
     createdAt: row.createdAt.toISOString(),

@@ -402,9 +402,10 @@ model DeskSource {
   title        String
   /// URL, file path, or a human description of where this came from.
   origin       String
-  /// pending | transcribed | failed
+  /// pending | processing | transcribed | failed
   status       String   @default("pending")
   /// Which engine produced the transcript. "placeholder" means none did.
+  /// "manual" is a transcript the user pasted. "gemini" is speech Gemini returned.
   provider     String   @default("")
   language     String?
   durationMs   Int?
@@ -412,6 +413,13 @@ model DeskSource {
   transcript   String   @default("")
   /// JSON array of {startMs, endMs, text}
   segmentsJson String   @default("[]")
+  /// Pasted transcript kept so a failed draft can be retried. Not a skill.
+  inputText    String   @default("")
+  /// SKILL.md text. Empty unless a draft was parsed. Never a watched skill.
+  skillDraft   String   @default("")
+  skillName    String   @default("")
+  /// unfinished | draft. This column does not store watched or approved.
+  skillReadiness String @default("unfinished")
   error        String?
   createdBy    String
   createdAt    DateTime @default(now())

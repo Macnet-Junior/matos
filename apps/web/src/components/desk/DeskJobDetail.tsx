@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Badge, Button } from "@matos/ui";
+import { DeskSourcesPanel } from "@/components/desk/DeskSourcesPanel";
 import { DESK_STAGES, STAGE_LABELS, type DeskStage } from "@/lib/desk/stages";
 import type { DeskJobDTO } from "@/lib/desk";
 
@@ -229,6 +230,7 @@ export function DeskJobDetail({
         </aside>
 
         <section className="flex min-h-0 flex-col overflow-auto p-4">
+          <DeskSourcesPanel jobId={job.id} canRun={canRun} />
           {job.stage === "filed" ? (
             <div className="rounded-xl border border-matos-border bg-matos-panel p-4 text-sm text-matos-muted">
               This job is filed in{" "}

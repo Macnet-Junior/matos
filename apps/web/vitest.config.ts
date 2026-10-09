@@ -24,6 +24,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "skillwright/youtube-skill": path.resolve(__dirname, "../skillwright/src/lib/youtube-skill.ts"),
     },
   },
 });

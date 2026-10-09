@@ -17,7 +17,8 @@
     "paths": {
       "@/*": ["./src/*"],
       "@matos/ui": ["../../packages/ui/src/index.ts"],
-      "@matos/ui/*": ["../../packages/ui/src/*"]
+      "@matos/ui/*": ["../../packages/ui/src/*"],
+      "skillwright/youtube-skill": ["../skillwright/src/lib/youtube-skill.ts"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

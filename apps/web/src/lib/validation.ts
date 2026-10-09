@@ -239,6 +239,13 @@ export const createDeskSourceSchema = z.object({
   jobId: z.string().trim().min(1).max(64).optional().nullable(),
 });
 
+export const youtubeSkillSchema = z.object({
+  jobId: z.string().trim().min(1).max(64),
+  title: z.string().trim().max(160).optional(),
+  youtubeUrl: z.string().trim().max(600).optional(),
+  transcript: z.string().max(100_000).optional(),
+});
+
 export const ingestDeskSourceSchema = z.object({
   // A file path on the machine the desk runs on. The route does not accept a
   // URL here: fetching a remote file at ingest time is a different decision
