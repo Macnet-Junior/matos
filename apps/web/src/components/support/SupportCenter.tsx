@@ -128,22 +128,21 @@ export function SupportCenter({
                   </p>
                 </div>
                 {canOps ? (
-                  <div className="flex gap-1">
-                    {["open", "pending", "solved"].map((s) => (
-                      <button
-                        key={s}
-                        type="button"
-                        onClick={() => void setStatus(t.id, s)}
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                          t.status === s
-                            ? "bg-matos-citron text-[#0b0c0e]"
-                            : "bg-[#1c2030] text-matos-muted"
-                        }`}
-                      >
-                        {s}
-                      </button>
-                    ))}
-                  </div>
+                  <label className="text-[10px] text-matos-muted">
+                    Status
+                    <select
+                      aria-label={`Status for ${t.subject}`}
+                      className="ml-1 rounded-lg border border-matos-border bg-matos-bg px-2 py-1 text-[11px] text-matos-text"
+                      value={t.status}
+                      onChange={(event) => void setStatus(t.id, event.target.value)}
+                    >
+                      {["open", "pending", "solved"].map((status) => (
+                        <option key={status} value={status}>
+                          {status}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                 ) : null}
               </div>
               <p className="mt-2 text-xs text-matos-muted">{t.body}</p>

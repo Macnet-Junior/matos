@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { OverflowMenu } from "@/components/OverflowMenu";
 
 type Attempt = {
   id: string;
@@ -141,32 +142,40 @@ export function AutoResponseDesk({
                 </p>
               </div>
               {canManage ? (
-                <div className="flex flex-wrap gap-1.5">
+                <div className="flex flex-wrap items-center gap-1.5">
                   {r.reviewGate !== "approved" ? (
                     <button
                       type="button"
-                      className="rounded-lg border border-matos-citron px-2 py-1 text-[10px] font-bold text-matos-citron"
+                      className="rounded-lg bg-matos-citron px-2.5 py-1.5 text-[11px] font-bold text-[#0b0c0e]"
                       onClick={() => void act("approve", r.id)}
                     >
                       Approve gate
                     </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    className="rounded-lg bg-[#1c2030] px-2 py-1 text-[10px] font-semibold"
-                    onClick={() =>
-                      void act(r.enabled ? "disable" : "enable", r.id)
-                    }
-                  >
-                    {r.enabled ? "Disable" : "Enable"}
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-lg bg-[#1c2030] px-2 py-1 text-[10px] font-semibold"
-                    onClick={() => void act("attempt", r.id)}
-                  >
-                    Sim attempt
-                  </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="rounded-lg bg-matos-citron px-2.5 py-1.5 text-[11px] font-bold text-[#0b0c0e]"
+                      onClick={() => void act(r.enabled ? "disable" : "enable", r.id)}
+                    >
+                      {r.enabled ? "Disable" : "Enable"}
+                    </button>
+                  )}
+                  <OverflowMenu
+                    items={[
+                      ...(r.reviewGate !== "approved"
+                        ? [
+                            {
+                              label: r.enabled ? "Disable" : "Enable",
+                              onSelect: () => void act(r.enabled ? "disable" : "enable", r.id),
+                            },
+                          ]
+                        : []),
+                      {
+                        label: "Sim attempt",
+                        onSelect: () => void act("attempt", r.id),
+                      },
+                    ]}
+                  />
                 </div>
               ) : null}
             </div>

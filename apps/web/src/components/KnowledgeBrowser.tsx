@@ -73,9 +73,10 @@ export function KnowledgeBrowser({
             </li>
           ))}
         </ul>
-        <h2 className="mt-5 text-xs font-semibold tracking-tight text-matos-text">
-          Skill links
-        </h2>
+        <details className="mt-5">
+          <summary className="cursor-pointer list-none text-xs font-semibold tracking-tight text-matos-text [&::-webkit-details-marker]:hidden">
+            Linked from skills ({links.length})
+          </summary>
         <ul className="mt-3 space-y-2">
           {links.map((l) => (
             <li
@@ -95,6 +96,7 @@ export function KnowledgeBrowser({
             </li>
           ))}
         </ul>
+        </details>
       </section>
       <section className="rounded-xl border border-matos-border bg-matos-panel p-4">
         <h2 className="text-xs font-semibold tracking-tight text-matos-text">

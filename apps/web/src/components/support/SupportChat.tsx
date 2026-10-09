@@ -88,6 +88,7 @@ export function SupportChat({
       </div>
       <div className="flex gap-2 border-t border-matos-soft p-4">
         <input
+          aria-label="Ask support"
           className="flex-1 rounded-lg border border-matos-border bg-matos-bg px-3 py-2 text-xs"
           placeholder="Ask support…"
           value={input}
