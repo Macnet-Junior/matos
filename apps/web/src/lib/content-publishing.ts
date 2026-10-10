@@ -252,12 +252,21 @@ const nativeDeliveries = new Map<string, NativeRecord>();
  * vars `content-publications.ts` uses so the write path and the read path
  * cannot disagree about whether a channel is live.
  */
+export type NativeDeliveryEnv = {
+  NEWSLETTER_DELIVERY_URL?: string;
+  BLOG_DELIVERY_URL?: string;
+};
+
 export function nativeDeliveryUrl(
   channel: "newsletter" | "blog",
-  env: NodeJS.ProcessEnv = process.env,
+  env?: NativeDeliveryEnv,
 ): string | null {
+  const source = env ?? {
+    NEWSLETTER_DELIVERY_URL: process.env.NEWSLETTER_DELIVERY_URL,
+    BLOG_DELIVERY_URL: process.env.BLOG_DELIVERY_URL,
+  };
   const key = channel === "newsletter" ? "NEWSLETTER_DELIVERY_URL" : "BLOG_DELIVERY_URL";
-  return env[key]?.trim() || null;
+  return source[key]?.trim() || null;
 }
 
 export function readNativeDelivery(externalId: string): NativeRecord | null {
@@ -296,7 +305,7 @@ export function nativeRecordFromPublication(input: {
   externalId: string | null;
   idempotencyKey: string;
   meta: Record<string, unknown>;
-  env?: NodeJS.ProcessEnv;
+  env?: NativeDeliveryEnv;
 }): NativeRecord | null {
   if (input.channel !== "newsletter" && input.channel !== "blog") return null;
   if (input.provider !== "native" && input.meta.provider !== "native") return null;

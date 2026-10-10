@@ -345,13 +345,21 @@ export function deliveryEndpointHost(raw: string | undefined): string | null {
   }
 }
 
-export function nativeDeliveryChannels(
-  env: NodeJS.ProcessEnv = process.env,
-): ChannelDTO[] {
-  return (["newsletter", "blog"] as const).map((id) => nativeDeliveryChannel(id, env));
+export function nativeDeliveryChannels(env?: {
+  NEWSLETTER_DELIVERY_URL?: string;
+  BLOG_DELIVERY_URL?: string;
+}): ChannelDTO[] {
+  const source = env ?? {
+    NEWSLETTER_DELIVERY_URL: process.env.NEWSLETTER_DELIVERY_URL,
+    BLOG_DELIVERY_URL: process.env.BLOG_DELIVERY_URL,
+  };
+  return (["newsletter", "blog"] as const).map((id) => nativeDeliveryChannel(id, source));
 }
 
-function nativeDeliveryChannel(id: NativeChannelId, env: NodeJS.ProcessEnv): ChannelDTO {
+function nativeDeliveryChannel(
+  id: NativeChannelId,
+  env: { NEWSLETTER_DELIVERY_URL?: string; BLOG_DELIVERY_URL?: string },
+): ChannelDTO {
   const envKey = id === "newsletter" ? "NEWSLETTER_DELIVERY_URL" : "BLOG_DELIVERY_URL";
   const live = Boolean(env[envKey]?.trim());
   const host = deliveryEndpointHost(env[envKey]);

@@ -424,7 +424,9 @@ describe("desk scheduler (db)", () => {
       expect(
         await prisma.activityEvent.count({ where: { action: "desk.publication.reconciled" } }),
       ).toBe(reconciledBefore + 1);
-      gets.push(...calls.filter((call) => call.method === "GET").map((call) => call.key));
+      for (const call of calls) {
+        if (call.method === "GET" && call.key) gets.push(call.key);
+      }
     });
 
     // Read-back asked with the same key the POST stored, not only the prefixed id.

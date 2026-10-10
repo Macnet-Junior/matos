@@ -1,4 +1,7 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it } from "vitest";
+import { ChannelsPanel } from "@/components/ChannelsPanel";
 import { listChannelStatus, nativeDeliveryChannels } from "./accounts";
 
 const NEWS = "NEWSLETTER_DELIVERY_URL";
@@ -58,6 +61,23 @@ describe("native delivery channels", () => {
       expect.arrayContaining(["late-dev", "etsy", "whatsapp", "newsletter", "blog"]),
     );
     expect(JSON.stringify(channels)).not.toContain("/deliver");
+  });
+
+  it("renders newsletter and blog on the channels panel without the URL", () => {
+    const channels = nativeDeliveryChannels({
+      NEWSLETTER_DELIVERY_URL: "http://user:secret@127.0.0.1:3099/deliver?token=secret",
+    });
+    const html = renderToStaticMarkup(
+      createElement(ChannelsPanel, { initialChannels: channels, canManage: true }),
+    );
+    expect(html).toContain("Newsletter");
+    expect(html).toContain("Blog");
+    expect(html).toContain("Live-configured");
+    expect(html).toContain("Simulated");
+    expect(html).toContain("127.0.0.1:3099");
+    expect(html).not.toContain("secret");
+    expect(html).not.toContain("/deliver");
+    expect(html).not.toContain("token=");
   });
 });
 
