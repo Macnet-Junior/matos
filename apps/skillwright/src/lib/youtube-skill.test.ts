@@ -3,9 +3,8 @@ import test from "node:test";
 import {
   DEFAULT_GEMINI_MODEL,
   MISSING_GEMINI_KEY_MESSAGE,
+  VIDEO_BLOCKED_MESSAGE,
   VIDEO_TOO_LONG_MESSAGE,
-  YOUTUBE_FRAME_FPS,
-  YOUTUBE_MEDIA_RESOLUTION,
   YOUTUBE_TIMEOUT_MESSAGE,
   draftSkillFromInput,
   parsePastedTranscript,
@@ -68,6 +67,36 @@ function assertUnfinished(result: DraftSkillResult) {
   assert.equal("skillMarkdown" in result, false);
 }
 
+async function withErrorLog(run: (logs: string[]) => Promise<void>): Promise<void> {
+  const logs: string[] = [];
+  const original = console.error;
+  console.error = (...args: unknown[]) => {
+    logs.push(args.map((part) => String(part)).join(" "));
+  };
+  try {
+    await run(logs);
+  } finally {
+    console.error = original;
+  }
+}
+
+function assertPlainVideoRequest(body: string, videoUrl: string) {
+  const payload = JSON.parse(body) as {
+    contents: Array<{ parts: Array<{ fileData?: { fileUri?: string }; text?: string }> }>;
+    generationConfig?: unknown;
+  };
+  assert.equal(payload.contents[0]?.parts[0]?.fileData?.fileUri, videoUrl);
+  assert.equal(payload.generationConfig, undefined);
+  const folded = body.toLowerCase();
+  assert.equal(folded.includes("file_data"), false);
+  assert.equal(folded.includes("mediaresolution"), false);
+  assert.equal(folded.includes("media_resolution"), false);
+  assert.equal(folded.includes("videometadata"), false);
+  assert.equal(folded.includes("video_metadata"), false);
+  assert.equal(folded.includes("\"fps\""), false);
+  assert.equal(body.includes(KEY), false);
+}
+
 test("a YouTube URL becomes a draft skill and is never watched", async () => {
   let called: { url: string; header: string | null; body: string } | null = null;
   const result = await draftSkillFromInput(
@@ -107,21 +136,22 @@ test("a YouTube URL becomes a draft skill and is never watched", async () => {
   assert.equal(request.url.includes("key="), false);
   assert.equal(request.header, KEY);
   const payload = JSON.parse(request.body) as {
-    contents: Array<{
-      parts: Array<{
-        file_data?: { file_uri: string; mime_type: string };
-        video_metadata?: { fps: number };
-      }>;
-    }>;
-    generation_config?: { media_resolution?: string };
+    contents: Array<{ parts: Array<{ fileData?: { fileUri?: string } }> }>;
+    generationConfig?: { temperature?: number; responseMimeType?: string };
   };
   assert.equal(
-    payload.contents[0]?.parts[0]?.file_data?.file_uri,
+    payload.contents[0]?.parts[0]?.fileData?.fileUri,
     "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
   );
-  assert.equal(payload.contents[0]?.parts[0]?.file_data?.mime_type, "video/*");
-  assert.equal(payload.contents[0]?.parts[0]?.video_metadata?.fps, YOUTUBE_FRAME_FPS);
-  assert.equal(payload.generation_config?.media_resolution, YOUTUBE_MEDIA_RESOLUTION);
+  assert.equal(payload.generationConfig?.responseMimeType, "application/json");
+  assert.equal(payload.generationConfig?.temperature, 0.2);
+  const folded = request.body.toLowerCase();
+  assert.equal(folded.includes("file_data"), false);
+  assert.equal(folded.includes("mediaresolution"), false);
+  assert.equal(folded.includes("media_resolution"), false);
+  assert.equal(folded.includes("videometadata"), false);
+  assert.equal(folded.includes("video_metadata"), false);
+  assert.equal(folded.includes("\"fps\""), false);
   assert.equal(request.body.includes(KEY), false);
 });
 
@@ -148,17 +178,21 @@ test("a YouTube read that runs past the limit stays unfinished", async () => {
 });
 
 test("a video Gemini calls too long stays unfinished and does not leak the key", async () => {
+  let calls = 0;
   const result = await draftSkillFromInput(
     { mode: "youtube", url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" },
     {
       env: { GEMINI_API_KEY: KEY },
-      fetchImpl: async () =>
-        jsonResponse(
+      fetchImpl: async () => {
+        calls += 1;
+        return jsonResponse(
           { error: { message: `The video exceeds the maximum allowed duration (${KEY}).` } },
           400,
-        ),
+        );
+      },
     },
   );
+  assert.equal(calls, 1);
   assertUnfinished(result);
   if (result.ok) return;
   assert.equal(result.code, "call_failed");
@@ -167,35 +201,238 @@ test("a video Gemini calls too long stays unfinished and does not leak the key",
 });
 
 test("a failed Gemini call stays unfinished and retryable", async () => {
+  let calls = 0;
+  await withErrorLog(async (logs) => {
+    const result = await draftSkillFromInput(
+      { mode: "youtube", url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" },
+      {
+        env: { GEMINI_API_KEY: KEY },
+        fetchImpl: async () => {
+          calls += 1;
+          return jsonResponse({ error: { message: `leak ${KEY}` } }, 502);
+        },
+      },
+    );
+    assert.equal(calls, 2);
+    assertUnfinished(result);
+    if (result.ok) return;
+    assert.equal(result.code, "call_failed");
+    assert.match(result.reason, /problem on its side/i);
+    assert.match(result.reason, /HTTP 502/);
+    assert.equal(result.reason.includes(KEY), false);
+    const logged = logs.join("\n");
+    assert.match(logged, /Gemini HTTP 502 \(json\)/);
+    assert.match(logged, /Gemini HTTP 502 \(plain\)/);
+    assert.match(logged, /leak \[redacted\]/);
+    assert.equal(logged.includes(KEY), false);
+  });
+});
+
+test("a Gemini 500 on the tuned request falls back to the plain body that worked", async () => {
+  const bodies: string[] = [];
+  await withErrorLog(async (logs) => {
+    const result = await draftSkillFromInput(
+      { mode: "youtube", url: "https://www.youtube.com/watch?v=eWKY0OnPByg" },
+      {
+        env: { GEMINI_API_KEY: KEY },
+        fetchImpl: async (_url, init) => {
+          const body = String(init?.body ?? "");
+          bodies.push(body);
+          if (bodies.length === 1) {
+            return jsonResponse(
+              { error: { message: `Internal error encountered. key=${KEY}` } },
+              500,
+            );
+          }
+          return jsonResponse(geminiEnvelope(GOOD_SKILL));
+        },
+      },
+    );
+    assert.equal(bodies.length, 2);
+    const first = JSON.parse(bodies[0] ?? "{}") as {
+      generationConfig?: { responseMimeType?: string };
+    };
+    assert.equal(first.generationConfig?.responseMimeType, "application/json");
+    assertPlainVideoRequest(
+      bodies[1] ?? "",
+      "https://www.youtube.com/watch?v=eWKY0OnPByg",
+    );
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.equal(result.watched, false);
+    assert.equal(result.skillName, "faceless-workflow");
+    const logged = logs.join("\n");
+    assert.match(logged, /Gemini HTTP 500 \(json\)/);
+    assert.match(logged, /Internal error encountered/);
+    assert.match(logged, /retrying the plain YouTube request/);
+    assert.equal(logged.includes(KEY), false);
+  });
+});
+
+test("a 400 that rejects a tuning option retries the plain request", async () => {
+  const bodies: string[] = [];
+  const result = await draftSkillFromInput(
+    { mode: "youtube", url: "https://www.youtube.com/watch?v=eWKY0OnPByg" },
+    {
+      env: { GEMINI_API_KEY: KEY },
+      fetchImpl: async (_url, init) => {
+        bodies.push(String(init?.body ?? ""));
+        if (bodies.length === 1) {
+          return jsonResponse(
+            { error: { message: 'Unknown name "responseMimeType": Cannot find field.' } },
+            400,
+          );
+        }
+        return jsonResponse(geminiEnvelope(GOOD_SKILL));
+      },
+    },
+  );
+  assert.equal(bodies.length, 2);
+  assertPlainVideoRequest(bodies[1] ?? "", "https://www.youtube.com/watch?v=eWKY0OnPByg");
+  assert.equal(result.ok, true);
+});
+
+test("a request Gemini still rejects names HTTP 400 and Google's sentence", async () => {
+  let calls = 0;
+  await withErrorLog(async (logs) => {
+    const result = await draftSkillFromInput(
+      { mode: "youtube", url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" },
+      {
+        env: { GEMINI_API_KEY: KEY },
+        fetchImpl: async () => {
+          calls += 1;
+          return jsonResponse(
+            { error: { message: `Invalid argument in the request (${KEY}).` } },
+            400,
+          );
+        },
+      },
+    );
+    assert.equal(calls, 2);
+    assertUnfinished(result);
+    if (result.ok) return;
+    assert.match(result.reason, /rejected the request we sent/);
+    assert.match(result.reason, /HTTP 400/);
+    assert.match(result.reason, /Invalid argument/);
+    assert.doesNotMatch(result.reason, /problem on its side/i);
+    assert.equal(result.reason.includes(KEY), false);
+    assert.match(logs.join("\n"), /Gemini HTTP 400/);
+    assert.equal(logs.join("\n").includes(KEY), false);
+  });
+});
+
+test("an HTTP 503 that says unavailable is a Google-side error", async () => {
   const result = await draftSkillFromInput(
     { mode: "youtube", url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" },
     {
       env: { GEMINI_API_KEY: KEY },
-      fetchImpl: async () => jsonResponse({ error: { message: `leak ${KEY}` } }, 502),
+      fetchImpl: async () =>
+        jsonResponse({ error: { message: "Service unavailable." } }, 503),
     },
   );
   assertUnfinished(result);
   if (result.ok) return;
-  assert.equal(result.code, "call_failed");
   assert.match(result.reason, /problem on its side/i);
-  assert.equal(result.reason.includes(KEY), false);
+  assert.match(result.reason, /HTTP 503/);
+  assert.match(result.reason, /Service unavailable/);
+  assert.doesNotMatch(result.reason, /public YouTube/);
 });
 
-test("a network failure stays unfinished", async () => {
+test("a private video is not retried and is not called a Google outage", async () => {
+  let calls = 0;
   const result = await draftSkillFromInput(
     { mode: "youtube", url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" },
     {
       env: { GEMINI_API_KEY: KEY },
       fetchImpl: async () => {
-        throw new Error(`connect ${KEY}`);
+        calls += 1;
+        return jsonResponse({ error: { message: "The video is private." } }, 400);
       },
     },
   );
+  assert.equal(calls, 1);
   assertUnfinished(result);
   if (result.ok) return;
-  assert.equal(result.code, "call_failed");
-  assert.match(result.reason, /Could not reach Gemini/);
-  assert.equal(result.reason.includes(KEY), false);
+  assert.match(result.reason, /public YouTube link/);
+  assert.doesNotMatch(result.reason, /problem on its side/i);
+  assert.doesNotMatch(result.reason, /rejected the request we sent/);
+});
+
+test("a blocked video says it was blocked", async () => {
+  const cases = [
+    { promptFeedback: { blockReason: "SAFETY" }, candidates: [] },
+    {
+      candidates: [
+        { finishReason: "PROHIBITED_CONTENT", content: { parts: [{ text: "" }] } },
+      ],
+    },
+  ];
+  for (const body of cases) {
+    let calls = 0;
+    await withErrorLog(async (logs) => {
+      const result = await draftSkillFromInput(
+        { mode: "youtube", url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" },
+        {
+          env: { GEMINI_API_KEY: KEY },
+          fetchImpl: async () => {
+            calls += 1;
+            return jsonResponse(body);
+          },
+        },
+      );
+      assert.equal(calls, 1);
+      assertUnfinished(result);
+      if (result.ok) return;
+      assert.equal(result.code, "call_failed");
+      assert.equal(result.reason, VIDEO_BLOCKED_MESSAGE);
+      assert.doesNotMatch(result.reason, /problem on its side/i);
+      assert.doesNotMatch(result.reason, /not a skill/i);
+      assert.match(logs.join("\n"), /Gemini HTTP 200 \(json\): blocked/);
+      assert.equal(logs.join("\n").includes(KEY), false);
+    });
+  }
+});
+
+test("a JSON-mode reply that is not JSON retries the plain request", async () => {
+  let calls = 0;
+  const result = await draftSkillFromInput(
+    { mode: "youtube", url: "https://www.youtube.com/watch?v=eWKY0OnPByg" },
+    {
+      env: { GEMINI_API_KEY: KEY },
+      fetchImpl: async () => {
+        calls += 1;
+        if (calls === 1) {
+          return jsonResponse({
+            candidates: [{ content: { parts: [{ text: "Here is a one-sentence summary." }] } }],
+          });
+        }
+        return jsonResponse(geminiEnvelope(GOOD_SKILL));
+      },
+    },
+  );
+  assert.equal(calls, 2);
+  assert.equal(result.ok, true);
+});
+
+test("a network failure stays unfinished", async () => {
+  await withErrorLog(async (logs) => {
+    const result = await draftSkillFromInput(
+      { mode: "youtube", url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" },
+      {
+        env: { GEMINI_API_KEY: KEY },
+        fetchImpl: async () => {
+          throw new Error(`connect ${KEY}`);
+        },
+      },
+    );
+    assertUnfinished(result);
+    if (result.ok) return;
+    assert.equal(result.code, "call_failed");
+    assert.match(result.reason, /Could not reach Gemini/);
+    assert.equal(result.reason.includes(KEY), false);
+    assert.match(logs.join("\n"), /Gemini request failed \(json\): Error/);
+    assert.equal(logs.join("\n").includes(KEY), false);
+  });
 });
 
 test("a reply that is not a skill stays unfinished and is not a draft", async () => {
