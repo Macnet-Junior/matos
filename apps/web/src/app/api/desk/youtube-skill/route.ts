@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireDeskRun } from "@/lib/owner";
 import { YoutubeSkillInputError, startYoutubeSkill } from "@/lib/desk/youtube-source";
-import { youtubeSkillSchema } from "@/lib/validation";
+import { youtubeSkillRequestError, youtubeSkillSchema } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
@@ -15,20 +15,20 @@ export async function POST(req: Request) {
   const parsed = youtubeSkillSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "Validation failed", issues: parsed.error.flatten() },
+      { error: youtubeSkillRequestError(body, parsed.error) },
       { status: 400 },
     );
   }
 
   try {
-    const outcome = await startYoutubeSkill({
+    const started = await startYoutubeSkill({
       jobId: parsed.data.jobId,
       title: parsed.data.title,
       youtubeUrl: parsed.data.youtubeUrl,
       transcript: parsed.data.transcript,
       actorEmail: gate.email,
     });
-    return NextResponse.json(outcome);
+    return NextResponse.json({ source: started.source, grade: started.grade });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Could not draft a skill";
     const status = err instanceof YoutubeSkillInputError && message.includes("not found") ? 404 : 400;

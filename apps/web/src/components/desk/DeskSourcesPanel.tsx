@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Badge, Button } from "@matos/ui";
+import { sourceKindLabel } from "@/lib/desk/source-kind-label";
 import type { DeskSourceDTO } from "@/lib/desk/sources";
 import type { SourceGradeView } from "@/lib/desk/youtube-source";
 
@@ -51,6 +52,19 @@ export function DeskSourcesPanel({
       setError(err instanceof Error ? err.message : "Could not load sources");
     });
   }, [refresh]);
+
+  const sources = load?.sources ?? [];
+  const processing = sources.some((source) => source.status === "processing");
+
+  useEffect(() => {
+    if (!processing) return;
+    const id = window.setInterval(() => {
+      refresh().catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : "Could not load sources");
+      });
+    }, 2000);
+    return () => window.clearInterval(id);
+  }, [processing, refresh]);
 
   async function submit(mode: "youtube" | "transcript") {
     setBusy(true);
@@ -108,14 +122,13 @@ export function DeskSourcesPanel({
     }
   }
 
-  const sources = load?.sources ?? [];
-
   return (
     <div className="mb-4 rounded-xl border border-matos-border bg-matos-panel p-3">
       <div>
         <h2 className="text-sm font-semibold tracking-tight">Sources</h2>
         <p className="mt-0.5 text-[11px] text-matos-muted">
           Paste a YouTube link. Skillwright asks Gemini to draft a skill and grade the words.
+          A normal video takes a few minutes. One longer than about an hour often fails — paste a transcript instead.
         </p>
       </div>
 
@@ -189,19 +202,18 @@ export function DeskSourcesPanel({
         <p className="mt-2 text-[11px] text-matos-muted">You can read sources. You cannot add one.</p>
       )}
 
-      {busy ? (
-        <p className="mt-3 text-xs text-matos-muted">Processing. This can take a minute.</p>
-      ) : null}
-
       {error ? <p className="mt-3 text-xs text-matos-danger">{error}</p> : null}
 
       <ul className="mt-4 space-y-3">
         {sources.length === 0 ? (
           <li className="text-xs text-matos-muted">No sources yet.</li>
         ) : (
-          sources.map((source) => (
+          sources.map((source) => {
+            const kind = sourceKindLabel(source.origin);
+            return (
             <li key={source.id} className="rounded-lg border border-matos-soft bg-matos-elev p-3">
               <div className="flex flex-wrap items-center gap-2">
+                {kind ? <Badge tone="muted">{kind}</Badge> : null}
                 <span className="text-xs font-semibold text-matos-text">{source.title}</span>
                 <Badge tone={statusTone(source.status)}>{statusLabel(source.status)}</Badge>
                 {source.provider ? (
@@ -219,7 +231,11 @@ export function DeskSourcesPanel({
                 <p className="mt-2 text-xs text-matos-muted">{source.error}</p>
               ) : null}
               {source.status === "processing" ? (
-                <p className="mt-2 text-xs text-matos-muted">Reading it now. This can take a minute.</p>
+                <p className="mt-2 text-xs text-matos-muted">
+                  {kind === "YouTube"
+                    ? "Reading the video. A normal one takes a few minutes. Nothing is saved until it finishes."
+                    : "Drafting a skill from the transcript. Nothing is saved until it finishes."}
+                </p>
               ) : null}
 
               {source.status === "failed" && canRun ? (
@@ -256,7 +272,8 @@ export function DeskSourcesPanel({
                 </div>
               ) : null}
             </li>
-          ))
+            );
+          })
         )}
       </ul>
     </div>

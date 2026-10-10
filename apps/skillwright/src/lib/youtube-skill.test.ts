@@ -3,6 +3,10 @@ import test from "node:test";
 import {
   DEFAULT_GEMINI_MODEL,
   MISSING_GEMINI_KEY_MESSAGE,
+  VIDEO_TOO_LONG_MESSAGE,
+  YOUTUBE_FRAME_FPS,
+  YOUTUBE_MEDIA_RESOLUTION,
+  YOUTUBE_TIMEOUT_MESSAGE,
   draftSkillFromInput,
   parsePastedTranscript,
   parseYouTubeUrl,
@@ -103,14 +107,63 @@ test("a YouTube URL becomes a draft skill and is never watched", async () => {
   assert.equal(request.url.includes("key="), false);
   assert.equal(request.header, KEY);
   const payload = JSON.parse(request.body) as {
-    contents: Array<{ parts: Array<{ file_data?: { file_uri: string; mime_type: string } }> }>;
+    contents: Array<{
+      parts: Array<{
+        file_data?: { file_uri: string; mime_type: string };
+        video_metadata?: { fps: number };
+      }>;
+    }>;
+    generation_config?: { media_resolution?: string };
   };
   assert.equal(
     payload.contents[0]?.parts[0]?.file_data?.file_uri,
     "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
   );
   assert.equal(payload.contents[0]?.parts[0]?.file_data?.mime_type, "video/*");
+  assert.equal(payload.contents[0]?.parts[0]?.video_metadata?.fps, YOUTUBE_FRAME_FPS);
+  assert.equal(payload.generation_config?.media_resolution, YOUTUBE_MEDIA_RESOLUTION);
   assert.equal(request.body.includes(KEY), false);
+});
+
+test("a YouTube read that runs past the limit stays unfinished", async () => {
+  const result = await draftSkillFromInput(
+    { mode: "youtube", url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" },
+    {
+      env: { GEMINI_API_KEY: KEY },
+      timeoutMs: 20,
+      fetchImpl: async (_url, init) => {
+        assert.ok(init?.signal);
+        const err = new Error("The operation was aborted");
+        err.name = "TimeoutError";
+        throw err;
+      },
+    },
+  );
+  assertUnfinished(result);
+  if (result.ok) return;
+  assert.equal(result.code, "call_failed");
+  assert.equal(result.reason, YOUTUBE_TIMEOUT_MESSAGE);
+  assert.match(result.reason, /paste a transcript/i);
+  assert.equal(result.reason.includes(KEY), false);
+});
+
+test("a video Gemini calls too long stays unfinished and does not leak the key", async () => {
+  const result = await draftSkillFromInput(
+    { mode: "youtube", url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" },
+    {
+      env: { GEMINI_API_KEY: KEY },
+      fetchImpl: async () =>
+        jsonResponse(
+          { error: { message: `The video exceeds the maximum allowed duration (${KEY}).` } },
+          400,
+        ),
+    },
+  );
+  assertUnfinished(result);
+  if (result.ok) return;
+  assert.equal(result.code, "call_failed");
+  assert.equal(result.reason, VIDEO_TOO_LONG_MESSAGE);
+  assert.equal(result.reason.includes(KEY), false);
 });
 
 test("a failed Gemini call stays unfinished and retryable", async () => {
@@ -281,7 +334,7 @@ test("segment times may be clock strings", async () => {
   assert.equal(result.segments[1]?.startMs, 40_000);
 });
 
-test("parseYouTubeUrl accepts watch, shorts, and youtu.be", () => {
+test("parseYouTubeUrl accepts watch, shorts, youtu.be, and a share-sheet paste", () => {
   assert.equal(
     parseYouTubeUrl("https://www.youtube.com/shorts/dQw4w9WgXcQ").ok,
     true,
@@ -289,4 +342,25 @@ test("parseYouTubeUrl accepts watch, shorts, and youtu.be", () => {
   const parsed = parseYouTubeUrl("https://m.youtube.com/watch?v=dQw4w9WgXcQ&list=PL");
   assert.equal(parsed.ok, true);
   if (parsed.ok) assert.equal(parsed.url, "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+
+  const share = parseYouTubeUrl(
+    "A normal video\nhttps://www.youtube.com/watch?v=eWKY0OnPByg",
+  );
+  assert.equal(share.ok, true);
+  if (share.ok) {
+    assert.equal(share.videoId, "eWKY0OnPByg");
+    assert.equal(share.url, "https://www.youtube.com/watch?v=eWKY0OnPByg");
+  }
+
+  const bare = parseYouTubeUrl("youtu.be/eWKY0OnPByg");
+  assert.equal(bare.ok, true);
+  if (bare.ok) assert.equal(bare.url, "https://www.youtube.com/watch?v=eWKY0OnPByg");
+
+  const playlist = parseYouTubeUrl("https://www.youtube.com/playlist?list=PLabcdefghij");
+  assert.equal(playlist.ok, false);
+  if (!playlist.ok) assert.match(playlist.reason, /video id/i);
+
+  const words = parseYouTubeUrl("not a link at all");
+  assert.equal(words.ok, false);
+  if (!words.ok) assert.match(words.reason, /not a YouTube link/i);
 });

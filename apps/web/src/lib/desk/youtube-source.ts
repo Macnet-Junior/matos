@@ -16,8 +16,11 @@ import { appendActivity } from "@/lib/map-data";
 import { gradeTranscript, type TranscriptGrade } from "@/lib/skills/grade";
 import {
   draftSkillFromInput,
+  geminiConfigured,
   parsePastedTranscript,
   parseYouTubeUrl,
+  YOUTUBE_READ_TIMEOUT_MS,
+  YOUTUBE_TIMEOUT_MESSAGE,
   type DraftSkillDeps,
   type DraftSkillResult,
 } from "skillwright/youtube-skill";
@@ -49,6 +52,23 @@ export type YoutubeSkillOutcome = {
   source: DeskSourceDTO;
   grade: SourceGradeView | null;
 };
+
+/**
+ * `source` is what the panel can show right away. `settled` finishes when
+ * Gemini does. The HTTP route returns `source` and does not wait on `settled`,
+ * so a normal video does not hold the request open until the abort fires.
+ */
+export type YoutubeSkillStart = YoutubeSkillOutcome & {
+  settled: Promise<YoutubeSkillOutcome>;
+};
+
+export const PASTED_TRANSCRIPT_ORIGIN = "Pasted transcript";
+
+const ABANDONED_READ_MESSAGE =
+  "The read stopped before it finished. Nothing was saved. Try again.";
+
+const inflight = new Map<string, Promise<YoutubeSkillOutcome>>();
+const processStartedAt = Date.now();
 
 function gradeView(grade: TranscriptGrade): SourceGradeView {
   return {
@@ -96,6 +116,93 @@ function isUsableDraft(result: DraftSkillResult): result is Extract<DraftSkillRe
     result.skillMarkdown.trim().length > 0 &&
     result.segments.some((segment) => segment.text.trim())
   );
+}
+
+function beginRead(
+  sourceId: string,
+  work: Promise<YoutubeSkillOutcome>,
+): Promise<YoutubeSkillOutcome> {
+  const slot: { current: Promise<YoutubeSkillOutcome> | null } = { current: null };
+  const guarded = work
+    .catch(async () => {
+      try {
+        const source = await clearToFailed(
+          sourceId,
+          "Could not reach Gemini. Check the connection and try again. Nothing was saved.",
+        );
+        return { source, grade: null };
+      } catch {
+        return {
+          source: {
+            id: sourceId,
+            jobId: null,
+            kind: "video" as const,
+            title: "",
+            origin: "",
+            status: "failed" as const,
+            provider: "",
+            language: null,
+            durationMs: null,
+            transcript: "",
+            segmentCount: 0,
+            skillName: "",
+            skillDraft: "",
+            skillReadiness: "unfinished" as const,
+            error: "Could not reach Gemini. Check the connection and try again. Nothing was saved.",
+            createdBy: "",
+            createdAt: new Date(0).toISOString(),
+            updatedAt: new Date(0).toISOString(),
+          },
+          grade: null,
+        };
+      }
+    })
+    .finally(() => {
+      if (slot.current && inflight.get(sourceId) === slot.current) inflight.delete(sourceId);
+    });
+  slot.current = guarded;
+  inflight.set(sourceId, guarded);
+  return guarded;
+}
+
+async function finishRead(
+  snapshot: DeskSourceDTO,
+  work: Promise<YoutubeSkillOutcome>,
+  background: boolean,
+): Promise<YoutubeSkillStart> {
+  const settled = beginRead(snapshot.id, work);
+  if (!background) {
+    const outcome = await settled;
+    return { ...outcome, settled: Promise.resolve(outcome) };
+  }
+  return { source: snapshot, grade: null, settled };
+}
+
+/**
+ * A processing row whose read is not running in this process is abandoned
+ * (the dev server restarted) or past the budget. Either way it becomes failed
+ * and retryable. A read that is still in flight is left alone.
+ */
+export async function reapAbandonedYoutubeReads(
+  owner: string,
+  opts?: { now?: number; processStartedAt?: number },
+): Promise<void> {
+  const now = opts?.now ?? Date.now();
+  const started = opts?.processStartedAt ?? processStartedAt;
+  const deadline = now - YOUTUBE_READ_TIMEOUT_MS - 15_000;
+  const rows = await prisma.deskSource.findMany({
+    where: { createdBy: owner, status: "processing" },
+  });
+  for (const row of rows) {
+    if (inflight.has(row.id)) continue;
+    const updatedAt = row.updatedAt.getTime();
+    // A row left processing by a previous process (dev server restart) is not
+    // in `inflight`. One this process started has a later updatedAt.
+    const diedWithProcess = updatedAt < started;
+    const overdue = updatedAt < deadline;
+    if (!diedWithProcess && !overdue) continue;
+    await clearToFailed(row.id, diedWithProcess && !overdue ? ABANDONED_READ_MESSAGE : YOUTUBE_TIMEOUT_MESSAGE);
+  }
 }
 
 async function clearToFailed(sourceId: string, reason: string): Promise<DeskSourceDTO> {
@@ -209,14 +316,36 @@ async function applyDraft(input: {
   return { source, grade: await gradeForSource(source.id) };
 }
 
-function titleFor(input: { title?: string; youtubeUrl?: string; transcript?: string }): string {
-  const given = input.title?.trim() ?? "";
-  if (given.length >= 2) return given.slice(0, 160);
-  if (input.youtubeUrl) {
-    const parsed = parseYouTubeUrl(input.youtubeUrl);
-    if (parsed.ok) return `YouTube ${parsed.videoId}`;
+function titleFor(
+  givenTitle: string | undefined,
+  video: { videoId: string } | null,
+): string {
+  const given = givenTitle?.trim() ?? "";
+  const givenIsLink = given.length > 0 && parseYouTubeUrl(given).ok;
+  if (video) {
+    if (given.length >= 2 && !givenIsLink) return given.slice(0, 160);
+    return `YouTube ${video.videoId}`;
   }
-  return "Pasted transcript";
+  if (given.length >= 2 && !givenIsLink) return given.slice(0, 160);
+  return PASTED_TRANSCRIPT_ORIGIN;
+}
+
+/**
+ * A transcript box that contains only a YouTube address (or the share-sheet
+ * blurb around one) is a YouTube source. A real transcript that mentions a
+ * link in passing stays a transcript.
+ */
+function transcriptIsOnlyALink(text: string): { url: string; videoId: string } | null {
+  const parsed = parseYouTubeUrl(text);
+  if (!parsed.ok) return null;
+  const stripped = text
+    .replace(/https?:\/\/\S+/gi, " ")
+    .replace(/(?:^|\s)(?:www\.|m\.)?(?:youtube\.com|youtube-nocookie\.com|youtu\.be)\/\S+/gi, " ")
+    .replace(/["'<>]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (stripped.length > 80) return null;
+  return parsed;
 }
 
 export async function startYoutubeSkill(input: {
@@ -226,7 +355,9 @@ export async function startYoutubeSkill(input: {
   youtubeUrl?: string;
   transcript?: string;
   deps?: DraftSkillDeps;
-}): Promise<YoutubeSkillOutcome> {
+  /** Wait for Gemini before returning. The route leaves this unset so the panel can show Processing. */
+  awaitResult?: boolean;
+}): Promise<YoutubeSkillStart> {
   const youtubeUrl = input.youtubeUrl?.trim() ?? "";
   const transcript = input.transcript?.trim() ?? "";
   if (youtubeUrl && transcript) {
@@ -240,49 +371,67 @@ export async function startYoutubeSkill(input: {
   if (!job) throw new YoutubeSkillInputError("Desk job not found");
 
   let origin = "";
-  let kind: SourceKind = "video";
+  const kind: SourceKind = "video";
   let inputText = "";
+  let video: { url: string; videoId: string } | null = null;
   if (youtubeUrl) {
     const parsed = parseYouTubeUrl(youtubeUrl);
     if (!parsed.ok) throw new YoutubeSkillInputError(parsed.reason);
+    video = parsed;
     origin = parsed.url;
   } else {
-    const segments = parsePastedTranscript(transcript);
-    if (segments.length === 0) {
-      throw new YoutubeSkillInputError(
-        "Paste the transcript or the words from the video. A blank note cannot become a skill.",
-      );
+    const asLink = transcriptIsOnlyALink(transcript);
+    if (asLink) {
+      video = asLink;
+      origin = asLink.url;
+    } else {
+      const segments = parsePastedTranscript(transcript);
+      if (segments.length === 0) {
+        throw new YoutubeSkillInputError(
+          "Paste the transcript or the words from the video. A blank note cannot become a skill.",
+        );
+      }
+      origin = PASTED_TRANSCRIPT_ORIGIN;
+      inputText = transcript;
     }
-    origin = "Pasted transcript";
-    inputText = transcript;
-    kind = "video";
   }
 
   const created = await createDeskSource({
     kind,
-    title: titleFor(input),
+    title: titleFor(input.title, video),
     origin,
     jobId: job.id,
     actorEmail: input.actorEmail,
   });
-  if (inputText) {
-    await prisma.deskSource.update({
-      where: { id: created.id },
-      data: { inputText },
-    });
-  }
-  return applyDraft({
-    sourceId: created.id,
-    actorEmail: input.actorEmail,
-    deps: input.deps,
+  const processing = await prisma.deskSource.update({
+    where: { id: created.id },
+    data: {
+      status: "processing",
+      error: null,
+      ...(inputText ? { inputText } : {}),
+    },
   });
+  const snapshot = toDeskSourceDTO(processing);
+  const env = input.deps?.env ?? process.env;
+  const background = input.awaitResult !== true && geminiConfigured(env);
+  return finishRead(
+    snapshot,
+    applyDraft({
+      sourceId: created.id,
+      actorEmail: input.actorEmail,
+      deps: input.deps,
+    }),
+    background,
+  );
 }
 
 export async function retryYoutubeSkill(input: {
   sourceId: string;
   actorEmail: string;
   deps?: DraftSkillDeps;
-}): Promise<YoutubeSkillOutcome> {
+  /** Wait for Gemini before returning. The route leaves this unset so the panel can show Processing. */
+  awaitResult?: boolean;
+}): Promise<YoutubeSkillStart> {
   const existing = await prisma.deskSource.findUnique({ where: { id: input.sourceId } });
   if (!existing || existing.createdBy !== input.actorEmail) {
     throw new YoutubeSkillInputError("Source not found");
@@ -290,9 +439,25 @@ export async function retryYoutubeSkill(input: {
   if (existing.status === "transcribed" && existing.skillReadiness === "draft") {
     throw new YoutubeSkillInputError("This draft is already done. Paste the link again to make another one.");
   }
-  return applyDraft({
-    sourceId: existing.id,
-    actorEmail: input.actorEmail,
-    deps: input.deps,
+  if (existing.status === "processing" && inflight.has(existing.id)) {
+    throw new YoutubeSkillInputError(
+      "That video is still being read. Wait until it finishes, then try again if it fails.",
+    );
+  }
+  const processing = await prisma.deskSource.update({
+    where: { id: existing.id },
+    data: { status: "processing", error: null },
   });
+  const snapshot = toDeskSourceDTO(processing);
+  const env = input.deps?.env ?? process.env;
+  const background = input.awaitResult !== true && geminiConfigured(env);
+  return finishRead(
+    snapshot,
+    applyDraft({
+      sourceId: existing.id,
+      actorEmail: input.actorEmail,
+      deps: input.deps,
+    }),
+    background,
+  );
 }
