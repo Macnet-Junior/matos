@@ -64,7 +64,7 @@ export default async function Page() {
         </div>
         <div className="rounded-xl border border-matos-border bg-matos-panel p-4">
           <div className="text-[11px] uppercase tracking-[0.08em] text-matos-muted2">
-            Pricing stub
+            Credit rates
           </div>
           <ul className="mt-2 space-y-1 text-[11px] text-matos-muted">
             {Object.entries(CREDIT_PRICING.kinds).map(([k, v]) => (

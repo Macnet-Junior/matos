@@ -21,6 +21,9 @@ export default defineConfig({
       MATOS_TEST_DB: "isolated",
     },
   },
+  esbuild: {
+    jsx: "automatic",
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

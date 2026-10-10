@@ -15,9 +15,9 @@ export default async function Page() {
           Publish &amp; Channels
         </h1>
         <p className="mt-1.5 max-w-2xl text-xs text-matos-muted">
-          Phase 4b adapters: Late.dev / Zernio, Etsy OAuth, WhatsApp Cloud
-          (allowlisted destination only). Keys stay server-side; without keys,
-          publish paths stay simulated.
+          Connect Late.dev, Etsy, or WhatsApp. Keys stay on the server. Without
+          a key, publish stays simulated and is labeled that way. WhatsApp only
+          sends to the allowlisted destination.
         </p>
       </div>
       <div className="overflow-auto p-[22px]">

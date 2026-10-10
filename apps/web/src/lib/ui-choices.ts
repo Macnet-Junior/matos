@@ -29,13 +29,10 @@ export const WORKSPACE_NAV: NavGroup = {
   id: "workspace",
   title: "Workspace",
   items: [
-    { href: "/brief", label: "Company brief" },
     { href: "/map", label: "Company map" },
     { href: "/workflows", label: "Workflows" },
     { href: "/skills", label: "Skills" },
     { href: "/knowledge", label: "Knowledge" },
-    { href: "/workbook", label: "Workbook" },
-    { href: "/repository", label: "Repository" },
   ],
 };
 

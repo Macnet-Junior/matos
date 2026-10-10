@@ -331,7 +331,7 @@ export function draftFromListingLab(fields: {
     title: fields.title?.trim() || "Untitled MatOS listing",
     description:
       fields.description?.trim() ||
-      "Draft from etsy-listing-lab (MatOS Phase 4b)",
+      "Draft from the etsy-listing-lab skill.",
     price: fields.price ?? "9.99",
     quantity: 1,
     who_made: "i_did",

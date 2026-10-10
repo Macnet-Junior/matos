@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@matos/db";
+import { presentActivity } from "@/lib/activity-present";
 import { requireOpsView } from "@/lib/owner";
 import { toActivityDTO } from "@/lib/map-data";
 
@@ -35,7 +36,7 @@ export async function GET(req: Request) {
   }
 
   return NextResponse.json({
-    events,
+    events: await presentActivity(events),
     generatedAt: new Date().toISOString(),
   });
 }

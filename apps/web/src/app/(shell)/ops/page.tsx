@@ -9,7 +9,7 @@ const links = [
   { href: "/ops/feed", label: "Live feed", desc: "Activity stream · poll 4s" },
   { href: "/ops/presence", label: "Presence", desc: "Who is online" },
   { href: "/ops/usage", label: "Usage", desc: "Resource meters" },
-  { href: "/ops/billing", label: "Billing", desc: "Credits · Stripe gated" },
+  { href: "/ops/billing", label: "Billing", desc: "Credit balance and ledger" },
   { href: "/ops/content", label: "Content", desc: "Publication performance" },
   { href: "/ops/auto-response", label: "Auto-response", desc: "Approved rules only" },
 ];

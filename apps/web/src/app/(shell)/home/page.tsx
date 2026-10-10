@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { Badge } from "@matos/ui";
-import { loadHomeDigest } from "@/lib/workflows";
-import type { ContentGate } from "@/lib/types";
+import { ActivityEntry } from "@/components/ActivityEntry";
+import { presentActivity } from "@/lib/activity-present";
+import { loadHomeDigest, listChannels } from "@/lib/workflows";
+import type { ChannelDTO, ContentGate } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -12,8 +14,31 @@ function gateTone(gate: ContentGate): "citron" | "muted" | "danger" {
   return "muted";
 }
 
+function channelsLine(channels: ChannelDTO[]): string {
+  if (channels.length === 0) {
+    return "No channels are set up yet.";
+  }
+  const connected = channels.filter((channel) => channel.status === "connected");
+  const names = channels.map((channel) => channel.name).join(", ");
+  if (connected.length === 0) {
+    return `${names} are not connected. Add a key there to publish for real. Until a channel is connected, publish stays simulated.`;
+  }
+  if (connected.length === channels.length) {
+    return `${names} are connected. Open that page to check a key or disconnect.`;
+  }
+  const waiting = channels
+    .filter((channel) => channel.status !== "connected")
+    .map((channel) => channel.name)
+    .join(", ");
+  return `${connected.map((channel) => channel.name).join(", ")} connected. ${waiting} still need a key.`;
+}
+
 export default async function Page() {
-  const digest = await loadHomeDigest();
+  const [digest, channels] = await Promise.all([
+    loadHomeDigest(),
+    listChannels(),
+  ]);
+  const activity = await presentActivity(digest.recentActivity);
 
   return (
     <main className="flex flex-1 flex-col bg-matos-bg">
@@ -109,18 +134,17 @@ export default async function Page() {
             </Link>
           </div>
           <ul className="mt-3 space-y-2">
-            {digest.recentActivity.length === 0 ? (
+            {activity.length === 0 ? (
               <li className="text-xs text-matos-muted">No activity yet.</li>
             ) : (
-              digest.recentActivity.map((e) => (
-                <li
-                  key={e.id}
-                  className="rounded-lg border border-matos-soft bg-matos-elev px-2.5 py-2"
-                >
-                  <p className="text-xs font-medium">{e.summary}</p>
-                  <p className="mt-1 font-mono text-[10px] text-matos-muted2">
-                    {e.action}
-                  </p>
+              activity.map((event) => (
+                <li key={event.id}>
+                  <ActivityEntry
+                    variant="compact"
+                    summary={event.summary}
+                    actionLabel={event.actionLabel}
+                    href={event.href}
+                  />
                 </li>
               ))
             )}
@@ -132,10 +156,9 @@ export default async function Page() {
             Channels
           </h2>
           <p className="mt-2 text-xs text-matos-muted">
-            Late.dev, Etsy, and WhatsApp stay{" "}
-            <span className="text-matos-text">Disconnected</span> until Phase 4.{" "}
+            {channelsLine(channels)}{" "}
             <Link href="/settings/channels" className="text-matos-citron">
-              Open Publish &amp; Channels
+              Publish &amp; Channels
             </Link>
           </p>
         </section>

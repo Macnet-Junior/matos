@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Badge, Button } from "@matos/ui";
 import type {
   DepartmentDTO,
@@ -10,7 +11,7 @@ import type {
   SkillDTO,
   SkillStatus,
 } from "@/lib/types";
-import { isKnowledgePath, knowledgeHref } from "@/lib/app-links";
+import { knowledgePageHref } from "@/lib/activity-target";
 import { MarkdownView } from "./MarkdownView";
 
 type Tab = "instructions" | "knowledge" | "evidence";
@@ -113,6 +114,38 @@ function KnowledgeTab({
   );
 }
 
+function EvidenceAddress({ url }: { url: string }) {
+  const knowledgeHref = knowledgePageHref(url);
+  const external = url.startsWith("http://") || url.startsWith("https://");
+  const className = "mt-0.5 block truncate font-mono text-[10px] text-matos-citron";
+
+  if (knowledgeHref) {
+    return (
+      <Link href={knowledgeHref} className={className} title={url}>
+        {url}
+      </Link>
+    );
+  }
+  if (external) {
+    return (
+      <a
+        href={url}
+        className={className}
+        target="_blank"
+        rel="noreferrer"
+        title={url}
+      >
+        {url}
+      </a>
+    );
+  }
+  return (
+    <span className="mt-0.5 block truncate font-mono text-[10px] text-matos-muted" title={url}>
+      {url}
+    </span>
+  );
+}
+
 function EvidenceTab({
   skill,
   capabilities,
@@ -191,19 +224,7 @@ function EvidenceTab({
               <div className="text-xs font-medium text-matos-text">
                 {item.label}
               </div>
-              <a
-                href={
-                  isKnowledgePath(item.url)
-                    ? knowledgeHref(item.url)
-                    : item.url
-                }
-                className="mt-0.5 block truncate font-mono text-[10px] text-matos-citron"
-                target={item.url.startsWith("http") ? "_blank" : undefined}
-                rel={item.url.startsWith("http") ? "noreferrer" : undefined}
-                title={item.url}
-              >
-                {item.url}
-              </a>
+              <EvidenceAddress url={item.url} />
             </div>
             {capabilities.canEditSkills && (
               <button

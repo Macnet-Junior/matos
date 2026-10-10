@@ -312,7 +312,7 @@ export async function listChannelStatus(): Promise<ChannelDTO[]> {
         lateStatus === "connected"
           ? "API key stored server-side. Schedule/publish when review gate is approved."
           : "Paste a Late/Zernio API key to connect. Without a key, publish stays simulated.",
-      phase: "Phase 4b",
+      phase: "",
       connectMode: "api_key",
       maskedHint: lateHint,
       lastError: lateRow?.lastError ?? null,
@@ -333,7 +333,7 @@ export async function listChannelStatus(): Promise<ChannelDTO[]> {
         etsyStatus === "connected"
           ? "OAuth tokens stored server-side. Draft listings from etsy-listing-lab when connected."
           : "Connect via Etsy Open API v3 OAuth (PKCE). Set ETSY_API_KEY + ETSY_REDIRECT_URI first.",
-      phase: "Phase 4b",
+      phase: "",
       connectMode: "oauth",
       maskedHint: null,
       lastError: etsyRow?.lastError ?? null,
@@ -352,7 +352,7 @@ export async function listChannelStatus(): Promise<ChannelDTO[]> {
       status: waStatus,
       note:
         "HARD BOUNDARY: only the configured Career path / content creation monetization destination. Review gate required before send.",
-      phase: "Phase 4b",
+      phase: "",
       connectMode: "env",
       maskedHint: wa.token ? maskSecret(wa.token) : null,
       lastError: waRow?.lastError ?? null,

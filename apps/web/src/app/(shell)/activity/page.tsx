@@ -1,9 +1,17 @@
 import { prisma } from "@matos/db";
+import { ActivityEntry } from "@/components/ActivityEntry";
+import { ActivityExportButton } from "@/components/ActivityExportButton";
+import { presentActivity } from "@/lib/activity-present";
 import { toActivityDTO } from "@/lib/map-data";
 import { getSessionFlags } from "@/lib/owner";
-import { ActivityExportButton } from "@/components/ActivityExportButton";
 
 export const dynamic = "force-dynamic";
+
+function formatWhen(iso: string): string {
+  return new Date(iso).toLocaleString("en-US", {
+    timeZone: "America/New_York",
+  });
+}
 
 export default async function Page() {
   const { canExportActivity } = await getSessionFlags();
@@ -11,7 +19,7 @@ export default async function Page() {
     orderBy: { createdAt: "desc" },
     take: 100,
   });
-  const events = rows.map(toActivityDTO);
+  const events = await presentActivity(rows.map(toActivityDTO));
 
   return (
     <main className="flex flex-1 flex-col bg-matos-bg">
@@ -31,30 +39,15 @@ export default async function Page() {
             No activity yet.
           </div>
         ) : (
-          events.map((e) => (
-            <article
-              key={e.id}
-              className="rounded-xl border border-matos-border bg-matos-panel px-3.5 py-3"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-xs font-semibold tracking-tight">
-                    {e.summary}
-                  </h2>
-                  <p className="mt-1 font-mono text-[11px] text-matos-muted2">
-                    {e.action} · {e.entityType}/{e.entityId}
-                  </p>
-                </div>
-                <time className="shrink-0 text-[11px] text-matos-muted2">
-                  {new Date(e.createdAt).toLocaleString("en-US", {
-                    timeZone: "America/New_York",
-                  })}
-                </time>
-              </div>
-              {e.actorEmail ? (
-                <p className="mt-2 text-[11px] text-matos-muted">{e.actorEmail}</p>
-              ) : null}
-            </article>
+          events.map((event) => (
+            <ActivityEntry
+              key={event.id}
+              summary={event.summary}
+              actionLabel={event.actionLabel}
+              href={event.href}
+              when={formatWhen(event.createdAt)}
+              actorEmail={event.actorEmail}
+            />
           ))
         )}
       </div>

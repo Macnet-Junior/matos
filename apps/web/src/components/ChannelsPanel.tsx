@@ -173,14 +173,9 @@ export function ChannelsPanel({
                   </p>
                 ) : null}
               </div>
-              <div className="flex flex-col items-end gap-2">
-                <Badge tone={statusTone(ch.status)}>
-                  {statusLabel(ch.status)}
-                </Badge>
-                <span className="rounded-lg border border-matos-border px-3 py-1.5 text-[11px] text-matos-muted2">
-                  {ch.phase}
-                </span>
-              </div>
+              <Badge tone={statusTone(ch.status)}>
+                {statusLabel(ch.status)}
+              </Badge>
             </div>
 
             {ch.id === "late-dev" && canManage ? (

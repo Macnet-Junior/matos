@@ -8,6 +8,7 @@ import {
   consumptionForPeriod,
   estimateUsd,
   latestBalance,
+  stripeBillingGate,
 } from "@/lib/ops/billing";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +29,7 @@ export async function GET(req: Request) {
   });
   const period = await consumptionForPeriod(since);
   return NextResponse.json({
-    stripeStatus: "Stripe connect — Phase 4b later",
+    stripeStatus: stripeBillingGate().reason,
     pricing: CREDIT_PRICING,
     balance,
     balanceUsd: estimateUsd(balance),
