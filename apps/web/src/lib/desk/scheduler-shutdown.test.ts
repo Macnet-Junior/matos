@@ -18,6 +18,10 @@ function webRoot(): string {
   return path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 }
 
+function stripComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+}
+
 /** Injected hooks so a unit test never disconnects the shared Prisma client or closes this process's fetch pool. */
 function hooks(overrides: Partial<SchedulerShutdownDeps> = {}): SchedulerShutdownDeps {
   return {
@@ -110,10 +114,17 @@ describe("scheduler shutdown", () => {
   });
 
   it("does not call process.exit from the cron entry", () => {
-    const source = fs.readFileSync(path.join(webRoot(), "scripts/desk-scheduler.ts"), "utf8");
+    const source = stripComments(
+      fs.readFileSync(path.join(webRoot(), "scripts/desk-scheduler.ts"), "utf8"),
+    );
     expect(source).not.toContain("process.exit(");
     expect(source).toContain("shutdownScheduler");
     expect(source).toContain("schedulerExitCode");
+    const shutdown = stripComments(
+      fs.readFileSync(path.join(webRoot(), "src/lib/desk/scheduler-shutdown.ts"), "utf8"),
+    );
+    // The grace-period timer is the only hard exit. Everything else sets exitCode.
+    expect(shutdown.match(/process\.exit\(/g)).toEqual(["process.exit("]);
   });
 });
 
