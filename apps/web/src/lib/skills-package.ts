@@ -4,6 +4,7 @@ import { appendActivity, toSkillDTO } from "@/lib/map-data";
 import type { MapPayload, SkillDTO } from "@/lib/types";
 import {
   createSkillSchema,
+  formatValidationError,
   skillPackageItemSchema,
   skillsPackageSchema,
   updateSkillSchema,
@@ -118,7 +119,7 @@ export function parseSkillsPackageRaw(raw: string):
       if (!parsed.success) {
         issues.push({
           line: lineNo,
-          error: "Validation failed",
+          error: formatValidationError(parsed.error),
           issues: parsed.error.flatten(),
         });
         continue;
@@ -126,7 +127,11 @@ export function parseSkillsPackageRaw(raw: string):
       skills.push(parsed.data);
     }
     if (issues.length) {
-      return { ok: false, error: "Validation failed", issues };
+      const summary = issues
+        .slice(0, 3)
+        .map((issue) => `Line ${issue.line}: ${issue.error}`)
+        .join(" ");
+      return { ok: false, error: summary, issues };
     }
     if (skills.length === 0) {
       return { ok: false, error: "No skills to import" };
@@ -159,7 +164,7 @@ export function parseSkillsPackageRaw(raw: string):
   if (!parsed.success) {
     return {
       ok: false,
-      error: "Validation failed",
+      error: formatValidationError(parsed.error),
       issues: parsed.error.flatten(),
     };
   }
@@ -287,7 +292,7 @@ export async function importSkillsPackage(
           });
           if (!checked.success) {
             throw new ImportValidationError(
-              `Validation failed for ${item.slug}`,
+              `Skill ${item.slug}: ${formatValidationError(checked.error)}`,
               checked.error.flatten(),
             );
           }
@@ -349,7 +354,7 @@ export async function importSkillsPackage(
           const checked = createSkillSchema.safeParse(createBody);
           if (!checked.success) {
             throw new ImportValidationError(
-              `Validation failed for ${item.slug}`,
+              `Skill ${item.slug}: ${formatValidationError(checked.error)}`,
               checked.error.flatten(),
             );
           }

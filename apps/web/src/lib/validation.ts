@@ -1,25 +1,83 @@
-import { z } from "zod";
+import { z, type ZodError, type ZodIssue } from "zod";
 import { CONTENT_PLATFORMS } from "./content-platforms";
 import { SOURCE_KINDS } from "./desk/sources";
 
 export const skillStatusSchema = z.enum(["authored", "planned", "missing"]);
 export const reviewGateSchema = z.enum(["Cold", "Warm", "Hot"]);
 
+const EVIDENCE_ADDRESS_WHY =
+  "must be a web link (example: https://etsy.com/listing/123) or a knowledge file path (example: knowledge/brand/voice.md)";
+
+/** A filename with a dot is not a web address. */
+const EVIDENCE_FILE_EXT =
+  /\.(md|markdown|txt|json|png|jpe?g|gif|webp|pdf|csv|html?)$/i;
+
+/**
+ * `www.etsy.com/listing/123` is a real link. Requiring `https://` up front
+ * rejected it on save and only reported "Validation failed".
+ * knowledge/ paths and site paths that start with / are left as written.
+ */
+export function normalizeEvidenceUrl(raw: string): string {
+  const value = raw.trim();
+  if (!value) return value;
+  if (/^https?:\/\//i.test(value)) return value;
+  if (value.startsWith("knowledge/") || value.startsWith("/")) return value;
+  if (/\s/.test(value) || value.includes("\\")) return value;
+  if (!isBareWebAddress(value)) return value;
+  return `https://${value}`;
+}
+
+function isBareWebAddress(value: string): boolean {
+  if (
+    !/^(?:www\.)?(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}(?::\d{2,5})?(?:[/?#]\S*)?$/i.test(
+      value,
+    )
+  ) {
+    return false;
+  }
+  const hasPath = /[/?#]/.test(value);
+  if (!hasPath && !/^www\./i.test(value) && EVIDENCE_FILE_EXT.test(value)) {
+    return false;
+  }
+  return true;
+}
+
 const evidenceLinkSchema = z.object({
   url: z
     .string()
     .trim()
     .min(1)
-    .max(500)
-    .refine(
-      (v) =>
-        /^https?:\/\//i.test(v) ||
-        v.startsWith("/") ||
-        v.startsWith("knowledge/"),
-      "url must be http(s), absolute path, or knowledge/ path",
+    .transform(normalizeEvidenceUrl)
+    .pipe(
+      z
+        .string()
+        .max(2000)
+        .refine(
+          (v) =>
+            /^https?:\/\//i.test(v) ||
+            v.startsWith("/") ||
+            v.startsWith("knowledge/"),
+          EVIDENCE_ADDRESS_WHY,
+        ),
     ),
   label: z.string().trim().min(1).max(120),
 });
+
+function coerceEvidenceItem(item: unknown): unknown {
+  if (typeof item !== "string") return item;
+  const trimmed = item.trim();
+  return { url: trimmed, label: trimmed.slice(0, 120) };
+}
+
+/**
+ * Evidence on create, update, and package import.
+ * Older rows stored a plain string; reading already accepts that shape,
+ * so saving it back has to accept it too.
+ */
+export const evidenceListSchema = z.preprocess((val) => {
+  if (!Array.isArray(val)) return val;
+  return val.map(coerceEvidenceItem);
+}, z.array(evidenceLinkSchema).max(40).optional());
 
 export const createDepartmentSchema = z.object({
   name: z.string().trim().min(2).max(80),
@@ -79,7 +137,7 @@ export const skillPackageItemSchema = z
     purpose: z.string().trim().max(500).optional(),
     instructions: z.string().trim().max(8000).optional(),
     steps: z.array(z.string().trim().min(1).max(400)).max(40).optional(),
-    evidence: z.array(evidenceLinkSchema).max(40).optional(),
+    evidence: evidenceListSchema,
     knowledgePaths: z.array(knowledgePathSchema).max(20).optional(),
     knowledge: z
       .array(
@@ -126,7 +184,7 @@ export const createSkillSchema = z.object({
   purpose: z.string().trim().max(500).optional(),
   instructions: z.string().trim().max(8000).optional(),
   steps: z.array(z.string().trim().min(1).max(400)).max(40).optional(),
-  evidence: z.array(evidenceLinkSchema).max(40).optional(),
+  evidence: evidenceListSchema,
   knowledgePaths: z
     .array(z.string().trim().min(1).max(200))
     .max(20)
@@ -142,7 +200,7 @@ export const updateSkillSchema = z.object({
   purpose: z.string().trim().max(500).optional(),
   instructions: z.string().trim().max(8000).optional(),
   steps: z.array(z.string().trim().min(1).max(400)).max(40).optional(),
-  evidence: z.array(evidenceLinkSchema).max(40).optional(),
+  evidence: evidenceListSchema,
   knowledgePaths: z
     .array(z.string().trim().min(1).max(200))
     .max(20)
@@ -184,6 +242,130 @@ export const autoArrangeSchema = z.object({
 });
 
 export { evidenceLinkSchema };
+
+const FIELD_NAMES: Record<string, string> = {
+  title: "Title",
+  description: "Description",
+  status: "Status",
+  owner: "Owner",
+  reviewGate: "Review gate",
+  purpose: "Purpose",
+  instructions: "Instructions",
+  steps: "Steps",
+  evidence: "Evidence",
+  knowledgePaths: "Knowledge paths",
+  departmentId: "Department",
+  slug: "Slug",
+  name: "Name",
+  summary: "Summary",
+  departmentSlug: "Department slug",
+};
+
+const CUSTOM_WHY: Record<string, string> = {
+  [EVIDENCE_ADDRESS_WHY]: EVIDENCE_ADDRESS_WHY,
+  "slug must be kebab-case":
+    "must use lowercase letters, numbers, and dashes only",
+  "departmentSlug must be kebab-case":
+    "must use lowercase letters, numbers, and dashes only",
+  "knowledge path must stay under knowledge/":
+    "must start with knowledge/ and stay inside that folder",
+  "title or name is required": "needs a title",
+  "departmentId or departmentSlug is required": "needs a department",
+};
+
+function fieldName(path: Array<string | number>): string {
+  if (path[0] === "skills" && typeof path[1] === "number") {
+    const rest = path.slice(2);
+    if (rest.length === 0) return `Skill ${path[1] + 1}`;
+    return `${fieldName(rest)} on skill ${path[1] + 1}`;
+  }
+  if (path[0] === "evidence") {
+    if (typeof path[1] !== "number") return "Evidence";
+    const n = path[1] + 1;
+    if (path[2] === "url") return `Evidence link ${n} address`;
+    if (path[2] === "label") return `Evidence link ${n} label`;
+    return `Evidence link ${n}`;
+  }
+  if (path[0] === "steps" && typeof path[1] === "number") {
+    return `Step ${path[1] + 1}`;
+  }
+  if (path[0] === "knowledgePaths") {
+    if (typeof path[1] === "number") return `Knowledge path ${path[1] + 1}`;
+    return "Knowledge paths";
+  }
+  if (path[0] === "knowledge" && typeof path[1] === "number") {
+    return `Knowledge file ${path[1] + 1}`;
+  }
+  const head = typeof path[0] === "string" ? path[0] : "";
+  if (!head) return "This form";
+  return FIELD_NAMES[head] ?? head;
+}
+
+function why(issue: ZodIssue): string {
+  if (issue.code === "too_small") {
+    if (issue.type === "string") {
+      const n = Number(issue.minimum);
+      return `needs at least ${n} ${n === 1 ? "character" : "characters"}`;
+    }
+    if (issue.type === "array") {
+      const n = Number(issue.minimum);
+      return `needs at least ${n} ${n === 1 ? "item" : "items"}`;
+    }
+    return "is too small";
+  }
+  if (issue.code === "too_big") {
+    if (issue.type === "string") {
+      const n = Number(issue.maximum);
+      return `must be ${n} ${n === 1 ? "character" : "characters"} or fewer`;
+    }
+    if (issue.type === "array") {
+      const n = Number(issue.maximum);
+      return `can have at most ${n} ${n === 1 ? "item" : "items"}`;
+    }
+    return "is too long";
+  }
+  if (issue.code === "invalid_enum_value") {
+    return `must be one of: ${issue.options.join(", ")}`;
+  }
+  if (issue.code === "invalid_type") {
+    if (issue.received === "undefined" || issue.received === "null") {
+      return "is required";
+    }
+    return "is in the wrong format";
+  }
+  const mapped = CUSTOM_WHY[issue.message];
+  if (mapped) return mapped;
+  const text = issue.message.replace(/\.$/, "");
+  return text.charAt(0).toLowerCase() + text.slice(1);
+}
+
+function sentenceFor(issue: ZodIssue): string {
+  if (issue.path.length === 0) {
+    const text = issue.message.replace(/\.$/, "");
+    return `${text.charAt(0).toUpperCase()}${text.slice(1)}.`;
+  }
+  return `${fieldName(issue.path)} ${why(issue)}.`;
+}
+
+/** One plain sentence per field. Used by every skill save that shares this schema. */
+export function formatValidationError(error: ZodError): string {
+  const unique: ZodIssue[] = [];
+  const seen = new Set<string>();
+  for (const issue of error.issues) {
+    const key = issue.path.join(".");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(issue);
+  }
+  if (unique.length === 0) return "Check the form and try again.";
+  const shown = unique.slice(0, 8).map(sentenceFor);
+  const rest = unique.length - shown.length;
+  const tail =
+    rest > 0
+      ? ` ${rest} more ${rest === 1 ? "problem" : "problems"} on this form.`
+      : "";
+  return `${shown.join(" ")}${tail}`;
+}
 
 export const contentGateSchema = z.enum([
   "draft",

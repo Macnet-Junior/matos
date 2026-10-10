@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@matos/db";
 import { requireSkillEdit } from "@/lib/owner";
-import { createSkillSchema } from "@/lib/validation";
+import { createSkillSchema, formatValidationError } from "@/lib/validation";
 import { appendActivity, loadMapPayload, toSkillDTO } from "@/lib/map-data";
 import { deriveSkillStatus } from "@/lib/knowledge";
 
@@ -17,7 +17,7 @@ export async function POST(req: Request) {
   const parsed = createSkillSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "Validation failed", issues: parsed.error.flatten() },
+      { error: formatValidationError(parsed.error), issues: parsed.error.flatten() },
       { status: 400 },
     );
   }

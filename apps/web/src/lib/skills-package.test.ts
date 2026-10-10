@@ -72,7 +72,10 @@ describe("parseSkillsPackageRaw", () => {
       }),
     );
     expect(parsed.ok).toBe(false);
-    if (!parsed.ok) expect(parsed.error).toBe("Validation failed");
+    if (!parsed.ok) {
+      expect(parsed.error).toContain("needs a department");
+      expect(parsed.error.toLowerCase()).not.toContain("validation failed");
+    }
   });
 
   it("rejects knowledge path traversal", () => {
