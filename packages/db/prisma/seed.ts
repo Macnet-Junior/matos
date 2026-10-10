@@ -795,7 +795,7 @@ CTA: Open Desk and file your first brief.`,
       entityType: "company",
       entityId: company.id,
       summary:
-        "Seeded MatOS Agency with map, workflows, RBAC, integrations stubs, Phase 5 ops/support, and Phase 5.5 Desk",
+        "Seeded MatOS Agency with the company map, workflows, roles, channels, ops, support, and Desk",
       actorEmail: "system@matos.local",
       payloadJson: JSON.stringify({
         phase: 5.5,

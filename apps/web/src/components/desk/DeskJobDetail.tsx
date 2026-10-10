@@ -301,7 +301,7 @@ export function DeskJobDetail({
                   <p className="text-[11px] text-matos-muted">
                     {artifact
                       ? `Review: ${artifact.reviewState}${dirty ? " · unsaved edits" : ""}`
-                      : "No artifact yet — run this stage to generate a placeholder (or OpenAI if keyed)."}
+                      : "No draft yet. Run this stage to write one."}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">

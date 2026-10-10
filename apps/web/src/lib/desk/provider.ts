@@ -99,10 +99,10 @@ export class PlaceholderDeskProvider implements DeskLlmProvider {
             `2. Map the brief → artifact → approve loop in plain language.`,
             `3. Land on ${brief.offerCta}.`,
             ``,
-            `## Sources to cite (stub)`,
+            `## Sources to cite`,
             `- Internal brand voice / offer ladder`,
             `- Prior Warm-review wins from Workflows`,
-            `- Desk dry-run placeholders (no live web scrape in Phase 5.5)`,
+            `- This draft did not search the web. Add a source on the job if a fact needs a citation.`,
             ...(brief.grade ? ["", brief.grade.block] : []),
           ].join("\n"),
           meta: { provider: "placeholder", stage },
@@ -148,7 +148,7 @@ export class PlaceholderDeskProvider implements DeskLlmProvider {
             `- [x] Hook earns the stop`,
             `- [x] One idea per section`,
             `- [x] Channels considered: ${channels}`,
-            `- [ ] Facts flagged as stub (no live scrape)`,
+            `- [ ] Facts are not checked against a live source`,
             ``,
             `## Edited throughline`,
             `Lead with the operating pain in "${brief.topic}".`,
@@ -175,7 +175,7 @@ export class PlaceholderDeskProvider implements DeskLlmProvider {
                     ? `- Subject: Stop filing drafts in the void\n- Body: Walk Scout→Echo for "${brief.topic}". CTA: ${brief.offerCta}`
                     : ch === "blog"
                       ? `- Outline: Problem → Desk stages → Warm review → CTA (${brief.offerCta})`
-                      : `- Pack stub for ${ch}: adapt Editor throughline; CTA ${brief.offerCta}`,
+                      : `- ${ch}: adapt the Editor throughline. CTA ${brief.offerCta}`,
               ``,
             ]),
             `## Editor excerpt`,
@@ -217,7 +217,7 @@ export class PlaceholderDeskProvider implements DeskLlmProvider {
             ``,
             `## Reply B (skeptical)`,
             `Fair pushback. Gates exist so Operators approve before anything schedules.`,
-            `Nothing auto-publishes in this phase.`,
+            `Nothing publishes on its own. Approve Clock when this should land on the calendar.`,
             ``,
             `## Reply C (ready to act)`,
             `Open Desk, drop the brief, approve each stage. ${brief.offerCta}`,
@@ -227,7 +227,7 @@ export class PlaceholderDeskProvider implements DeskLlmProvider {
       default:
         return {
           title: `${label} artifact`,
-          body: `Stub artifact for ${stage}`,
+          body: `Draft for ${label}. Run the stage again if this looks thin.`,
           meta: { provider: "placeholder", stage },
         };
     }

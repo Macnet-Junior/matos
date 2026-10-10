@@ -23,7 +23,7 @@ function DesignPageInner() {
       <header>
         <h1 className="text-xl font-semibold tracking-tight">Design tokens</h1>
         <p className="mt-2 text-sm text-matos-muted">
-          Citron Volt system — precision dark UI for MatOS Phase 0.
+          Citron Volt colors, type, and controls used across MatOS.
         </p>
       </header>
 

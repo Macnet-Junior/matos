@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Badge } from "@matos/ui";
 import { getSessionFlags } from "@/lib/owner";
@@ -74,7 +75,12 @@ export default async function Page() {
               publications.map((item) => (
                 <li key={item.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-xs">
                   <div>
-                    <div className="text-matos-text">{item.jobTitle}</div>
+                    <Link
+                      href={`/desk/${item.jobId}`}
+                      className="text-matos-text hover:text-matos-citron"
+                    >
+                      {item.jobTitle}
+                    </Link>
                     <div className="text-matos-muted">
                       {item.channel} · {item.provider}
                     </div>

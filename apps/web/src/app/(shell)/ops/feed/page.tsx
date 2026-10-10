@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@matos/db";
+import { presentActivity } from "@/lib/activity-present";
 import { getSessionFlags } from "@/lib/owner";
 import { toActivityDTO } from "@/lib/map-data";
 import { LiveFeedClient } from "@/components/ops/LiveFeedClient";
@@ -13,7 +14,7 @@ export default async function Page() {
     orderBy: { createdAt: "desc" },
     take: 80,
   });
-  const events = rows.map(toActivityDTO);
+  const events = await presentActivity(rows.map(toActivityDTO));
 
   return (
     <main className="flex flex-1 flex-col bg-matos-bg">

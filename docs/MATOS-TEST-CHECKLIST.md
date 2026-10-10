@@ -20,7 +20,9 @@ HOME-1 Open Home and you should see Pending review gates, Last run, and Recent a
 
 HOME-2 On Home, Last run should show a workflow name or the line that says no runs yet and points at Workflows.
 
-HOME-3 On Home, the Channels line should say Late, Etsy, and WhatsApp stay disconnected, with a link to Publish & Channels.
+HOME-3 On Home, the Channels line should say Late.dev, Etsy, and WhatsApp are not connected, with a link to Publish & Channels. It should not say Phase 4.
+
+HOME-4 On Home, click the recent activity row for the seed note. It should open the company map. The line under the summary should be plain words such as Workspace seeded, not a code like seed.
 
 DESK-1 Open Desk and you should see six columns: Scout, Ghost, Editor, Press, Clock, Echo.
 
@@ -40,9 +42,9 @@ CAL-2 If a pack is listed, a pretend post must say simulated — not live. There
 
 INBOX-1 Open Inbox. You should see reply drafts, or the line that Echo has to be approved first.
 
-INBOX-2 If a draft is there, click Mark approved. The page should still say send is blocked. Nothing should be emailed or posted.
+INBOX-2 If a draft is there, click Mark approved. The page should still say nothing is sent. Nothing should be emailed or posted.
 
-BRIEF-1 Open Workspace → Company brief. You should see a Phase 0 shell note and a link to the Company map. You should not be able to edit a mission here.
+BRIEF-1 Company brief should not be in the sidebar. Open http://localhost:3040/brief and you should land on the company map, not a Phase 0 shell.
 
 MAP-1 Open Company map. You should see department bubbles and counts for authored, planned, and missing.
 
@@ -66,11 +68,11 @@ SKILL-2 On Skills, open Package. Export JSON should download a file. You can ski
 
 KNOW-1 Open Knowledge and click the brand voice file. You should see the note, not an error.
 
-BOOK-1 Open Workbook. You should see a Phase 0 shell and a link to the Company map.
+BOOK-1 Workbook should not be in the sidebar. Open http://localhost:3040/workbook and you should land on the company map, not a Phase 0 shell.
 
-REPO-1 Open Repository. You should see a Phase 0 shell and a link to the Company map.
+REPO-1 Repository should not be in the sidebar. Open http://localhost:3040/repository and you should land on the company map, not a Phase 0 shell.
 
-ACT-1 Open Records → Activity. You should see a list of events, newest first, or a clear empty state.
+ACT-1 Open Records → Activity. You should see a list of events, newest first, or a clear empty state. A row that names something should be a link. The action should be plain words, not a dotted code.
 
 CHAN-1 Open Records → Channels (page title Publish & Channels). It should say that without keys, publish stays simulated. It should not show a live connected account on a fresh setup.
 
@@ -119,6 +121,7 @@ LOGIN-1
 HOME-1 
 HOME-2 
 HOME-3 
+HOME-4 
 DESK-1 
 DESK-2 
 DESK-3 

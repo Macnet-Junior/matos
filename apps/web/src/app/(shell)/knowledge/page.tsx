@@ -12,12 +12,12 @@ export default async function Page({
   searchParams: Promise<{ path?: string }>;
 }) {
   const { canEditSkills } = await getSessionFlags();
+  const { path: initialPath } = await searchParams;
   const files = await listKnowledgeMarkdown();
   const links = await prisma.skillKnowledge.findMany({
     include: { skill: { select: { slug: true, title: true } } },
     orderBy: { path: "asc" },
   });
-  const { path: initialPath } = await searchParams;
 
   return (
     <main className="flex flex-1 flex-col bg-matos-bg">
@@ -33,7 +33,7 @@ export default async function Page({
       </div>
       <KnowledgeBrowser
         files={files}
-        initialPath={initialPath}
+        initialPath={initialPath ?? null}
         links={links.map((l) => ({
           id: l.id,
           path: l.path,

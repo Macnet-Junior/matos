@@ -42,8 +42,8 @@ export function DeskInbox({
     <div className="flex flex-1 flex-col gap-3 overflow-auto p-[22px]">
       <p className="max-w-xl text-xs text-matos-muted">
         Echo drafts only. Mark <span className="text-matos-text">approved</span>{" "}
-        or <span className="text-matos-text">copied</span> — there is no live
-        network send in this phase.
+        or <span className="text-matos-text">copied</span>. Nothing is sent
+        from this inbox.
       </p>
       {error ? <p className="text-xs text-matos-danger">{error}</p> : null}
       {items.length === 0 ? (
@@ -108,9 +108,7 @@ export function DeskInbox({
               >
                 Open job →
               </Link>
-              <span className="text-[10px] text-matos-muted2">
-                Send blocked by design
-              </span>
+              <span className="text-[10px] text-matos-muted2">Not sent</span>
             </div>
           </article>
         ))

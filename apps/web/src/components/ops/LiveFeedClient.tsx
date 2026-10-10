@@ -1,14 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ActivityEntry } from "@/components/ActivityEntry";
 import { moreFeedFilters, pinnedFeedFilters } from "@/lib/ui-choices";
 
 type Event = {
   id: string;
-  action: string;
-  entityType: string;
-  entityId: string;
   summary: string;
+  actionLabel: string;
+  href: string | null;
   actorEmail: string | null;
   createdAt: string;
 };
@@ -108,27 +108,16 @@ export function LiveFeedClient({ initial }: { initial: Event[] }) {
           </div>
         ) : (
           events.map((e) => (
-            <article
+            <ActivityEntry
               key={e.id}
-              className="rounded-xl border border-matos-border bg-matos-panel px-3.5 py-3"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-xs font-semibold tracking-tight">{e.summary}</h2>
-                  <p className="mt-1 font-mono text-[11px] text-matos-muted2">
-                    {e.action} · {e.entityType}/{e.entityId}
-                  </p>
-                </div>
-                <time className="shrink-0 text-[11px] text-matos-muted2">
-                  {new Date(e.createdAt).toLocaleString("en-US", {
-                    timeZone: "America/New_York",
-                  })}
-                </time>
-              </div>
-              {e.actorEmail ? (
-                <p className="mt-2 text-[11px] text-matos-muted">{e.actorEmail}</p>
-              ) : null}
-            </article>
+              summary={e.summary}
+              actionLabel={e.actionLabel}
+              href={e.href}
+              actorEmail={e.actorEmail}
+              when={new Date(e.createdAt).toLocaleString("en-US", {
+                timeZone: "America/New_York",
+              })}
+            />
           ))
         )}
       </div>

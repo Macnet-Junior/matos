@@ -108,7 +108,7 @@ export async function matchFaq(query: string): Promise<FaqReply> {
     return {
       kind: "escalate",
       text:
-        "I can’t process billing refunds or payment reversals in chat. Please open a Support ticket so an Owner can review credits under Ops → Billing. Stripe connect is not live yet (Phase 4b later).",
+        "I can’t process billing refunds or payment reversals in chat. Open a Support ticket and an Owner can review the credit ledger under Ops → Billing. Card charges are not turned on.",
       matches,
       usedLlm: false,
     };

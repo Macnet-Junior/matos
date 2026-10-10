@@ -39,12 +39,12 @@ Then, if you want to fix the company itself: Workspace → Company map → Conte
 
 1. Read **Pending review gates**. Each row is a workflow or a run that is still on draft or warm. Click it.
 2. Read **Last run**. Click the name to open the practice-run log.
-3. Read **Recent activity**. Click **View all** to open the full trail.
-4. Read **Channels**. It links to Publish & Channels.
+3. Read **Recent activity**. A row that names something is a link. Click it to open that thing (the seed note opens the company map). The line under the summary is plain words, such as “Workspace seeded”, not a code. A row with nothing behind it is not a link. **View all** opens the full trail.
+4. Read **Channels**. It says whether Late.dev, Etsy, and WhatsApp are connected, and it links to Publish & Channels.
 
 **What you should see.** Three cards plus a channels line. With seeded data, you should see workflow names, a last run or a prompt to dry-run, and recent lines such as the seed note.
 
-**Limits.** Home does not post anything. The channels line says Late, Etsy, and WhatsApp stay disconnected until they are connected. That page is actually built (see Channels). The “Phase 4” wording on Home is older than the Channels page.
+**Limits.** Home does not post anything. On a fresh setup the channels line says Late.dev, Etsy, and WhatsApp are not connected, and that publish stays simulated until one is. It does not say “Phase 4”.
 
 ## Desk
 
@@ -103,25 +103,25 @@ The six steps, in order:
 2. If a draft is there, read it.
 3. Click **Mark approved** or **Mark copied**.
 
-**What you should see.** The line “Send blocked by design” on a draft. If Echo has not been approved yet, you see: “Inbox empty. Approve Echo on a Desk job to draft replies here.”
+**What you should see.** The line “Not sent” on a draft, and a note that nothing is sent from this inbox. If Echo has not been approved yet, you see: “Inbox empty. Approve Echo on a Desk job to draft replies here.”
 
 **Limits.** **Not a sender.** Mark approved only changes the label. It does not email, post, or message anyone.
 
 ## Workspace
 
-Click **Workspace** at the top of the sidebar to open this group. Order: Company brief, Company map, Workflows, Skills, Knowledge, Workbook, Repository.
+Click **Workspace** at the top of the sidebar to open this group. Order: Company map, Workflows, Skills, Knowledge. Company brief, Workbook, and Repository are not in the sidebar. Opening those old addresses sends you to the company map.
 
 ### Company brief
 
-**What it’s for.** One day, the mission, offers, customer, and voice will live here.
+**What it’s for.** There is no brief editor. The company lives on the map and in knowledge files.
 
-**Where.** Workspace → **Company brief**. [http://localhost:3040/brief](http://localhost:3040/brief)
+**Where.** Not in the sidebar. [http://localhost:3040/brief](http://localhost:3040/brief) opens the company map.
 
-**How.** Open it. Click **Company map** in the note.
+**How.** Do not look for it under Workspace. Open Company map.
 
-**What you should see.** The title Company brief, and a box that says this is a Phase 0 shell. Content lands in a later phase.
+**What you should see.** The company map. Not a Phase 0 shell, and not a form for the mission.
 
-**Not finished.** You cannot edit the brief here yet. Use the Company map, and the knowledge files, for the live notes.
+**Not finished.** You cannot edit a brief on its own page. Use the Company map, and the knowledge files, for the live notes.
 
 ### Company map
 
@@ -195,31 +195,31 @@ A single file looks like [http://localhost:3040/knowledge?path=knowledge%2Fbrand
 
 **What you should see.** Files such as brand voice, mix ratios, and the support FAQs. The preview is the note, not raw code.
 
-**Limits.** This is the real note library. Repository (below) is not.
+**Limits.** This is the real note library. The old Repository address opens the company map. It is not a second library.
 
 ### Workbook
 
-**What it’s for.** One day, active projects and campaigns as structured runs.
+**What it’s for.** There is no project list. Active work is on Desk and Workflows.
 
-**Where.** Workspace → **Workbook**. [http://localhost:3040/workbook](http://localhost:3040/workbook)
+**Where.** Not in the sidebar. [http://localhost:3040/workbook](http://localhost:3040/workbook) opens the company map.
 
-**How.** Open it. Follow the link to the Company map.
+**How.** Do not look for it under Workspace.
 
-**What you should see.** A box that says this is a Phase 0 shell.
+**What you should see.** The company map. Not a Phase 0 shell.
 
 **Not finished.** There is no project list yet.
 
 ### Repository
 
-**What it’s for.** One day, a tree of canon docs and skill sources.
+**What it’s for.** There is no separate canon tree. Notes live under Knowledge.
 
-**Where.** Workspace → **Repository**. [http://localhost:3040/repository](http://localhost:3040/repository)
+**Where.** Not in the sidebar. [http://localhost:3040/repository](http://localhost:3040/repository) opens the company map.
 
-**How.** Open it. Follow the link to the Company map.
+**How.** Do not look for it under Workspace. Open Knowledge for the notes.
 
-**What you should see.** A box that says this is a Phase 0 shell.
+**What you should see.** The company map. Not a Phase 0 shell.
 
-**Not finished.** The live notes are under Knowledge, not here.
+**Not finished.** The live notes are under Knowledge.
 
 ## Records
 
@@ -231,9 +231,9 @@ Click **Records** in the sidebar.
 
 **Where.** Records → **Activity**. [http://localhost:3040/activity](http://localhost:3040/activity)
 
-**How.** Scroll the list. An owner can click **Download JSON**.
+**How.** Scroll the list. Click a row that names something to open it. An owner can click **Download JSON**.
 
-**What you should see.** The newest events first, up to 100. Each line has a short summary.
+**What you should see.** The newest events first, up to 100. Each line has a short summary and plain words for what happened, not a dotted code. A row with nothing to open is not a link.
 
 **Limits.** It records. It does not undo.
 

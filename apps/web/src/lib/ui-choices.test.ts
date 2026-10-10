@@ -19,10 +19,7 @@ import {
 
 const EVERY_HREF = [
   "/home",
-  "/brief",
   "/map",
-  "/workbook",
-  "/repository",
   "/workflows",
   "/skills",
   "/knowledge",
@@ -92,13 +89,10 @@ describe("sidebar choice budget", () => {
     // count and the order both shift, which is what these assert.
     expect(allNavGroups(true)[0]!.id).toBe("workspace");
     expect(WORKSPACE_NAV.items.map((item) => item.href)).toEqual([
-      "/brief",
       "/map",
       "/workflows",
       "/skills",
       "/knowledge",
-      "/workbook",
-      "/repository",
     ]);
   });
 

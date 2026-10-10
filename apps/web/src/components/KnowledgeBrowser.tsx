@@ -15,15 +15,17 @@ type LinkRow = {
 export function KnowledgeBrowser({
   files,
   links,
-  initialPath,
+  initialPath = null,
 }: {
   files: string[];
   links: LinkRow[];
   initialPath?: string | null;
 }) {
+  const known = Boolean(initialPath && files.includes(initialPath));
   const [active, setActive] = useState<string | null>(
-    initialPath || files[0] || null,
+    initialPath && files.includes(initialPath) ? initialPath : (files[0] ?? null),
   );
+  const missing = Boolean(initialPath && !known);
   const [content, setContent] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -62,6 +64,11 @@ export function KnowledgeBrowser({
         <h2 className="text-xs font-semibold tracking-tight text-matos-text">
           Files
         </h2>
+        {missing ? (
+          <p className="mt-2 text-[11px] text-matos-muted">
+            {initialPath} is not in the knowledge folder. Pick a file below.
+          </p>
+        ) : null}
         <ul className="mt-3 space-y-2">
           {files.map((f) => (
             <li key={f}>
