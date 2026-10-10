@@ -57,6 +57,12 @@ describe("native delivery channels", () => {
     expect(newsletter?.deliveryMode).toBe("live-configured");
     expect(newsletter?.deliveryHost).toBe("127.0.0.1:3099");
     expect(blog?.deliveryMode).toBe("simulated");
+    const whatsapp = channels.find((channel) => channel.id === "whatsapp");
+    expect(whatsapp?.whatsappAllowlist).toMatchObject({
+      mode: "simulated",
+      destinations: [],
+    });
+    expect(whatsapp?.note).toMatch(/approved/i);
     expect(channels.map((channel) => channel.id)).toEqual(
       expect.arrayContaining(["late-dev", "etsy", "whatsapp", "newsletter", "blog"]),
     );
@@ -68,10 +74,44 @@ describe("native delivery channels", () => {
       NEWSLETTER_DELIVERY_URL: "http://user:secret@127.0.0.1:3099/deliver?token=secret",
     });
     const html = renderToStaticMarkup(
-      createElement(ChannelsPanel, { initialChannels: channels, canManage: true }),
+      createElement(ChannelsPanel, {
+        initialChannels: [
+          {
+            id: "whatsapp",
+            name: "WhatsApp",
+            status: "disconnected",
+            note: "Approved destinations only.",
+            phase: "",
+            connectMode: "env",
+            maskedHint: null,
+            lastError: null,
+            externalId: null,
+            meta: {},
+            coverage: {
+              api: "disconnected",
+              scheduled: "n/a",
+              handoff: "available",
+              disconnected: "yes",
+            },
+            allowedDestination: { id: null, label: "1 approved destination" },
+            whatsappAllowlist: {
+              count: 1,
+              mode: "simulated",
+              overCap: false,
+              rejectedCount: 0,
+              destinations: [{ label: "Desk", masked: "+237••••12" }],
+            },
+          },
+          ...channels,
+        ],
+        canManage: true,
+      }),
     );
     expect(html).toContain("Newsletter");
     expect(html).toContain("Blog");
+    expect(html).toContain("WhatsApp");
+    expect(html).toContain("1 approved destination");
+    expect(html).toContain("+237••••12");
     expect(html).toContain("Live-configured");
     expect(html).toContain("Simulated");
     expect(html).toContain("127.0.0.1:3099");
