@@ -3,6 +3,7 @@ import { Badge } from "@matos/ui";
 import { getSessionFlags } from "@/lib/owner";
 import { loadMapPayload } from "@/lib/map-data";
 import { SkillsPackageActions } from "@/components/SkillsPackageActions";
+import { skillMapHref } from "@/lib/app-links";
 import type { SkillStatus } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -51,7 +52,7 @@ export default async function Page() {
                   className="border-t border-matos-soft bg-matos-panel"
                 >
                   <td className="px-3 py-2 font-mono text-matos-citron">
-                    <Link href="/map">{skill.slug}</Link>
+                    <Link href={skillMapHref(skill.slug)}>{skill.slug}</Link>
                   </td>
                   <td className="px-3 py-2">{skill.title}</td>
                   <td className="px-3 py-2 text-matos-muted">{department}</td>
