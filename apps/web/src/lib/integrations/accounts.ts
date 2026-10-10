@@ -6,7 +6,8 @@ import { prisma, parseJsonObject } from "@matos/db";
 import { decryptSecret, encryptSecret, maskSecret } from "./credentials";
 import { lateApiBase, LateClient } from "./late";
 import { etsyEnv } from "./etsy";
-import { whatsappConfigFromEnv } from "./whatsapp";
+import { publicWhatsAppAllowlist, whatsappConfigFromEnv } from "./whatsapp";
+import { providerConfigHealth } from "../content-observability";
 import type { ChannelDTO, ChannelProvider, ChannelStatus } from "../types";
 
 export const PROVIDERS: ChannelProvider[] = ["late-dev", "etsy", "whatsapp"];
@@ -219,9 +220,10 @@ export async function connectEtsyTokens(input: {
 
 export async function connectWhatsAppFromEnv(): Promise<ChannelDTO> {
   const cfg = whatsappConfigFromEnv();
-  if (!cfg.token || !cfg.phoneNumberId || !cfg.allowedTo) {
+  const summary = publicWhatsAppAllowlist(cfg.allowlist);
+  if (!cfg.token || !cfg.phoneNumberId || summary.count === 0) {
     throw new Error(
-      "Set WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID, and WHATSAPP_GROUP_OR_TO",
+      "Set WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID, and WHATSAPP_ALLOWED_TO or WHATSAPP_GROUP_OR_TO",
     );
   }
   await upsertAccount({
@@ -230,8 +232,9 @@ export async function connectWhatsAppFromEnv(): Promise<ChannelDTO> {
     status: "connected",
     externalId: cfg.phoneNumberId,
     meta: {
-      allowedTo: cfg.allowedTo,
-      allowedLabel: "Career path and content creation monetization",
+      approvedDestinationCount: summary.count,
+      deliveryMode: "live-configured",
+      overCap: summary.overCap,
       phoneNumberId: cfg.phoneNumberId,
       source: "env",
     },
@@ -293,13 +296,19 @@ export async function listChannelStatus(): Promise<ChannelDTO[]> {
   const waRow = byProvider.get("whatsapp");
   let waStatus: ChannelStatus =
     (waRow?.status as ChannelStatus) || "disconnected";
-  if (!waRow && wa.token && wa.phoneNumberId && wa.allowedTo) {
+  const waSummary = publicWhatsAppAllowlist(wa.allowlist);
+  const waMode =
+    providerConfigHealth().find((item) => item.provider === "whatsapp")?.mode ??
+    "simulated";
+  const waLive = waMode === "live-configured";
+  if (!waRow && waLive) {
     waStatus = "connected";
   }
 
   const lateMeta = lateRow ? parseJsonObject(lateRow.metaJson) : {};
   const etsyMeta = etsyRow ? parseJsonObject(etsyRow.metaJson) : {};
   const waMeta = waRow ? parseJsonObject(waRow.metaJson) : {};
+  delete waMeta.allowedTo;
 
   const lateHint = lateKey.key ? maskSecret(lateKey.key) : null;
 
@@ -324,6 +333,7 @@ export async function listChannelStatus(): Promise<ChannelDTO[]> {
       },
       coverage: coverageFor("late-dev", lateStatus),
       allowedDestination: null,
+      whatsappAllowlist: null,
     },
     {
       id: "etsy",
@@ -345,13 +355,14 @@ export async function listChannelStatus(): Promise<ChannelDTO[]> {
       },
       coverage: coverageFor("etsy", etsyStatus),
       allowedDestination: null,
+      whatsappAllowlist: null,
     },
     {
       id: "whatsapp",
       name: "WhatsApp",
       status: waStatus,
       note:
-        "HARD BOUNDARY: only the configured Career path / content creation monetization destination. Review gate required before send.",
+        "HARD BOUNDARY: only approved destinations on the allowlist. Review gate required before send. A destination that is not on the list is rejected and never sent.",
       phase: "",
       connectMode: "env",
       maskedHint: wa.token ? maskSecret(wa.token) : null,
@@ -359,18 +370,21 @@ export async function listChannelStatus(): Promise<ChannelDTO[]> {
       externalId: waRow?.externalId ?? wa.phoneNumberId,
       meta: {
         ...waMeta,
-        envConfigured: Boolean(wa.token && wa.phoneNumberId && wa.allowedTo),
+        envConfigured: waLive,
+        approvedDestinationCount: waSummary.count,
+        deliveryMode: waMode,
       },
       coverage: coverageFor("whatsapp", waStatus),
-      allowedDestination: wa.allowedTo
-        ? {
-            id: wa.allowedTo,
-            label: "Career path and content creation monetization",
-          }
-        : {
-            id: null,
-            label: "Career path and content creation monetization (set WHATSAPP_GROUP_OR_TO)",
-          },
+      allowedDestination: {
+        id: null,
+        label: waSummary.count
+          ? `${waSummary.count} approved destination${waSummary.count === 1 ? "" : "s"}`
+          : "No approved destinations (set WHATSAPP_ALLOWED_TO or WHATSAPP_GROUP_OR_TO)",
+      },
+      whatsappAllowlist: {
+        ...waSummary,
+        mode: waMode,
+      },
     },
   ];
 }

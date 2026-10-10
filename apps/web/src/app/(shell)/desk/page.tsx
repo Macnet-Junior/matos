@@ -1,6 +1,7 @@
 import { getSessionFlags } from "@/lib/owner";
 import { deskOwner, listDeskJobs } from "@/lib/desk";
 import { DeskBoard } from "@/components/desk/DeskBoard";
+import { whatsappDestinationChoices } from "@/lib/integrations/whatsapp";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,11 @@ export default async function Page() {
           Relay Desk — content newsroom mode. Human gates on every stage.
         </p>
       </div>
-      <DeskBoard jobs={jobs} canRun={flags.canRunDesk} />
+      <DeskBoard
+        jobs={jobs}
+        canRun={flags.canRunDesk}
+        whatsappDestinations={whatsappDestinationChoices()}
+      />
     </main>
   );
 }

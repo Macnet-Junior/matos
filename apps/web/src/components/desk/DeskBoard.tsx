@@ -11,6 +11,7 @@ import {
   CONTENT_PLATFORMS,
 } from "@/lib/content-platforms";
 import { deskChannelGroups } from "@/lib/ui-choices";
+import type { WhatsAppDestinationChoice } from "@/lib/integrations/whatsapp-destinations";
 
 const CHANNELS = CONTENT_PLATFORMS;
 
@@ -25,9 +26,14 @@ function statusTone(
 export function DeskBoard({
   jobs: initial,
   canRun,
+  whatsappDestinations = { options: [], defaultTo: null },
 }: {
   jobs: DeskJobDTO[];
   canRun: boolean;
+  whatsappDestinations?: {
+    options: WhatsAppDestinationChoice[];
+    defaultTo: string | null;
+  };
 }) {
   const router = useRouter();
   const [jobs, setJobs] = useState(initial);
@@ -40,6 +46,14 @@ export function DeskBoard({
   const [title, setTitle] = useState("");
   const [dueAt, setDueAt] = useState("");
   const [channels, setChannels] = useState<string[]>(["linkedin", "x"]);
+  const [whatsappTo, setWhatsappTo] = useState(
+    whatsappDestinations.defaultTo ?? whatsappDestinations.options[0]?.to ?? "",
+  );
+
+  const whatsappOn = channels.includes("whatsapp");
+  const whatsappChoices = whatsappDestinations.options;
+  const whatsappReady =
+    !whatsappOn || (whatsappChoices.length > 0 && whatsappChoices.some((option) => option.to === whatsappTo));
 
   const byStage = useMemo(() => {
     const map = Object.fromEntries(
@@ -72,6 +86,7 @@ export function DeskBoard({
           offerCta,
           channels,
           dueAt: dueAt ? new Date(dueAt).toISOString() : null,
+          whatsappTo: channels.includes("whatsapp") ? whatsappTo : undefined,
         }),
       });
       const data = await res.json();
@@ -162,6 +177,29 @@ export function DeskBoard({
             <div className="sm:col-span-2">
               <ChannelPicker channels={channels} onToggle={toggleChannel} />
             </div>
+            {whatsappOn ? (
+              <label className="block text-xs text-matos-muted sm:col-span-2">
+                WhatsApp destination
+                {whatsappChoices.length > 0 ? (
+                  <select
+                    className="mt-1 w-full rounded-lg border border-matos-border bg-matos-elev px-3 py-2 text-sm text-matos-text"
+                    value={whatsappTo}
+                    onChange={(e) => setWhatsappTo(e.target.value)}
+                  >
+                    {whatsappChoices.map((option) => (
+                      <option key={option.to} value={option.to}>
+                        {option.label} · {option.masked}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="mt-1 text-matos-danger">
+                    No approved WhatsApp destinations. Set WHATSAPP_ALLOWED_TO or
+                    WHATSAPP_GROUP_OR_TO.
+                  </p>
+                )}
+              </label>
+            ) : null}
           </div>
           {error ? (
             <p className="mt-3 text-xs text-matos-danger">{error}</p>
@@ -175,7 +213,8 @@ export function DeskBoard({
                 !topic.trim() ||
                 !audience.trim() ||
                 !offerCta.trim() ||
-                channels.length === 0
+                channels.length === 0 ||
+                !whatsappReady
               }
               onClick={createBrief}
             >

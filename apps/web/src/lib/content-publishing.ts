@@ -22,6 +22,8 @@ export type ContentPublishInput = {
   accountId?: string | null;
   /** Desk approval is required before any non-simulated publisher runs. */
   approved?: boolean;
+  /** WhatsApp only. Must be on the approved list. Omitted uses the default. */
+  to?: string | null;
 };
 
 export type ContentPublishResult = {

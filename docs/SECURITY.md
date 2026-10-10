@@ -70,7 +70,7 @@ Skills and knowledge import/export reuse `skill:edit` (Owner + Author) via `requ
 - [ ] Dependency audit (`pnpm audit`) clean for criticals
 - [ ] No sample passwords accepted in production builds
 - [x] Live channel actions behind Owner connect + review gate (Phase 4b scaffolding)
-- [x] WhatsApp destination hard allowlist (`WHATSAPP_GROUP_OR_TO` only)
+- [x] WhatsApp destination hard allowlist (`WHATSAPP_ALLOWED_TO`, legacy `WHATSAPP_GROUP_OR_TO`)
 - [ ] Stripe / spend actions
 
 ## Reporting
@@ -82,5 +82,5 @@ Security issues: contact the repo owner (Macnet Junior) privately. Do not open p
 
 - Integration secrets are encrypted at rest (`apps/web/src/lib/integrations/credentials.ts`) and never returned to the client after save (masked hint only).
 - Do not log decrypted secrets or raw `Authorization` headers containing user keys.
-- WhatsApp Cloud sends are **hard-bound** to `WHATSAPP_GROUP_OR_TO` (Career path / content creation monetization). Any other `to` is rejected in code.
+- WhatsApp Cloud sends are **hard-bound** to the approved list in `WHATSAPP_ALLOWED_TO` (cap 10, optional `label|number`). `WHATSAPP_GROUP_OR_TO` remains a one-item list and the default when a post does not name a destination. Any other `to` is rejected in code. There is no wildcard.
 - WhatsApp send API requires `workflow:approve` permission and `reviewGateApproved: true`.

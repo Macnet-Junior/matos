@@ -408,6 +408,8 @@ export const createDeskBriefSchema = z.object({
   offerCta: z.string().trim().min(2).max(240),
   channels: z.array(deskChannelSchema).min(1).max(CONTENT_PLATFORMS.length),
   dueAt: z.string().datetime().optional().nullable(),
+  /** Chosen WhatsApp destination. Required only when whatsapp is one of the channels. */
+  whatsappTo: z.string().trim().max(120).optional().nullable(),
 });
 
 export const createDeskSourceSchema = z.object({

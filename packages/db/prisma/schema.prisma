@@ -362,6 +362,8 @@ model DeskJob {
   offerCta     String   @default("")
   /// JSON string array of channel names
   channelsJson String   @default("[]")
+  /// Approved WhatsApp destination chosen for this brief. Empty uses the env default.
+  whatsappTo   String   @default("")
   dueAt        DateTime?
   /// scout | ghost | editor | press | clock | echo | filed
   stage        String   @default("scout")

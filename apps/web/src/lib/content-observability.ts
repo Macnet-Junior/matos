@@ -1,3 +1,5 @@
+import { whatsappAllowlistFromEnv } from "./integrations/whatsapp-destinations";
+
 export type ProviderEventKind = "health" | "delivery" | "fallback";
 
 export type SafeProviderReason =
@@ -80,10 +82,11 @@ export type ProviderConfigHealth = {
 export function providerConfigHealth(env: NodeJS.ProcessEnv = process.env): ProviderConfigHealth[] {
   const late = Boolean(env.LATE_API_KEY?.trim());
   const etsy = Boolean(env.ETSY_API_KEY?.trim());
+  const whatsappAllowlist = whatsappAllowlistFromEnv(env);
   const whatsapp = Boolean(
     env.WHATSAPP_TOKEN?.trim() &&
       env.WHATSAPP_PHONE_NUMBER_ID?.trim() &&
-      env.WHATSAPP_GROUP_OR_TO?.trim(),
+      whatsappAllowlist.destinations.length > 0,
   );
   const newsletter = Boolean(env.NEWSLETTER_DELIVERY_URL?.trim());
   const blog = Boolean(env.BLOG_DELIVERY_URL?.trim());

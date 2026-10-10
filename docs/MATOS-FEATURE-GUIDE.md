@@ -67,7 +67,7 @@ The six steps, in order:
 2. Click a card. You land on a job page such as [http://localhost:3040/desk/desk-job-seed-1](http://localhost:3040/desk/desk-job-seed-1).
 3. Click **Run stage** to write the current step. Edit the text. Click **Save edits**.
 4. Click **Approve → next stage** to move forward, or **Request changes** to send it back. You can add a note.
-5. To start fresh, click **New brief**. Fill title, due date, topic, audience, and “what should they do next”. Pick channels (LinkedIn and X are shown first; the rest are under More). Submit. You should open the new job.
+5. To start fresh, click **New brief**. Fill title, due date, topic, audience, and “what should they do next”. Pick channels (LinkedIn and X are shown first; the rest are under More). If you turn on WhatsApp, the destination menu only lists approved numbers. Submit. You should open the new job.
 
 **What you should see.** Six columns. A job page with the brief on the side, the draft in the middle, and one obvious next button. After a full Echo approval, the job is filed and shows up in Library → Desk archive.
 
@@ -253,7 +253,7 @@ The page title is **Publish & Channels**.
 
 **What you should see.** A line that says without keys, publish paths stay simulated. Cards should not claim a live account if none is connected.
 
-**Limits.** With a fresh seed, channels are not connected. Calendar and the scheduler will say simulated until a provider is live. WhatsApp, even when keyed, may message only the one number set in `WHATSAPP_GROUP_OR_TO`.
+**Limits.** With a fresh seed, channels are not connected. Calendar and the scheduler will say simulated until a provider is live. WhatsApp may message only the approved list in `WHATSAPP_ALLOWED_TO` (comma-separated, optional `label|number`, at most 10). `WHATSAPP_GROUP_OR_TO` still works as a single destination and is the default when a post does not name one. The WhatsApp card shows how many destinations are configured, masks each number (for example `+237••••12`), and says `live-configured` or `simulated`. A number that is not on the list is rejected and not sent. There is no option to message anyone.
 
 ## Ops
 

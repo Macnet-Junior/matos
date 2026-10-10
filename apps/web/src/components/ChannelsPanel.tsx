@@ -18,6 +18,51 @@ function statusLabel(status: ChannelStatus): string {
 
 const COVERAGE_COLS = ["API", "Scheduled", "Handoff", "Disconnected"] as const;
 
+function WhatsAppAllowlistSummary({ channel }: { channel: ChannelDTO }) {
+  const allow = channel.whatsappAllowlist ?? {
+    count: 0,
+    mode: "simulated" as const,
+    overCap: false,
+    rejectedCount: 0,
+    destinations: [],
+  };
+  const noun = allow.count === 1 ? "destination" : "destinations";
+  return (
+    <div className="rounded-lg border border-matos-soft bg-matos-elev px-3 py-2 text-[11px] text-matos-muted">
+      <p>
+        <strong className="text-matos-text">
+          {allow.count} approved {noun}
+        </strong>
+        {" · "}
+        <strong className="text-matos-text">{allow.mode}</strong>
+      </p>
+      {allow.destinations.length > 0 ? (
+        <ul className="mt-2 space-y-1">
+          {allow.destinations.map((destination, index) => (
+            <li key={`${destination.masked}-${index}`}>
+              {destination.label ? `${destination.label} · ` : null}
+              <code className="text-matos-citron">{destination.masked}</code>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-2">
+          Set <code>WHATSAPP_ALLOWED_TO</code> or <code>WHATSAPP_GROUP_OR_TO</code>.
+          Full numbers are not shown.
+        </p>
+      )}
+      {allow.overCap ? (
+        <p className="mt-2 text-matos-danger">
+          Only 10 destinations are approved.
+          {allow.rejectedCount === 1
+            ? " 1 extra entry was rejected."
+            : ` ${allow.rejectedCount} extra entries were rejected.`}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export function ChannelsPanel({
   initialChannels,
   canManage,
@@ -239,20 +284,7 @@ export function ChannelsPanel({
 
             {ch.id === "whatsapp" ? (
               <div className="mt-3 space-y-2">
-                <p className="rounded-lg border border-matos-soft bg-matos-elev px-3 py-2 text-[11px] text-matos-muted">
-                  Allowed destination only:{" "}
-                  <strong className="text-matos-text">
-                    {ch.allowedDestination?.label}
-                  </strong>
-                  {ch.allowedDestination?.id ? (
-                    <>
-                      {" "}
-                      · id <code className="text-matos-citron">{ch.allowedDestination.id}</code>
-                    </>
-                  ) : (
-                    <> · set <code>WHATSAPP_GROUP_OR_TO</code></>
-                  )}
-                </p>
+                <WhatsAppAllowlistSummary channel={ch} />
                 {canManage ? (
                   <div className="flex flex-wrap gap-2">
                     <Button

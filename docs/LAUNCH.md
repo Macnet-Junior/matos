@@ -20,7 +20,8 @@ Copy `.env.example` → `apps/web/.env.local` (and `packages/db/.env` if running
 | `ETSY_REDIRECT_URI` | Optional | Default `http://localhost:3000/api/integrations/etsy/oauth/callback` |
 | `WHATSAPP_TOKEN` | Optional | Cloud API token |
 | `WHATSAPP_PHONE_NUMBER_ID` | Optional | Sending phone number id |
-| `WHATSAPP_GROUP_OR_TO` | Optional | **Sole** allowed destination (Career path / content monetization) |
+| `WHATSAPP_GROUP_OR_TO` | Optional | Legacy one-item allowlist, and the default destination when a post does not name one |
+| `WHATSAPP_ALLOWED_TO` | Optional | Comma-separated approved destinations (`label\|number` optional). Cap 10. No wildcard |
 
 ## Bootstrap
 

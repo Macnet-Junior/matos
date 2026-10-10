@@ -74,7 +74,7 @@ REPO-1 Repository should not be in the sidebar. Open http://localhost:3040/repos
 
 ACT-1 Open Records → Activity. You should see a list of events, newest first, or a clear empty state. A row that names something should be a link. The action should be plain words, not a dotted code.
 
-CHAN-1 Open Records → Channels (page title Publish & Channels). It should say that without keys, publish stays simulated. It should not show a live connected account on a fresh setup.
+CHAN-1 Open Records → Channels (page title Publish & Channels). It should say that without keys, publish stays simulated. It should not show a live connected account on a fresh setup. The WhatsApp card should say how many approved destinations are configured, mask numbers (never the full number), and say simulated rather than live-configured when WhatsApp is not keyed.
 
 OPS-1 Open Ops. You should see an online count and links to Feed, Presence, Usage, Billing, Content, and Auto-response.
 

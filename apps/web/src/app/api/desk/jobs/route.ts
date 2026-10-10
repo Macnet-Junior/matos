@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { requireDeskRun } from "@/lib/owner";
 import { createDeskBriefSchema } from "@/lib/validation";
 import { createDeskJob, deskOwner, listDeskJobs, listFiledDeskJobs } from "@/lib/desk";
+import { assertWhatsAppDestinationAllowed, whatsappAllowlistFromEnv } from "@/lib/integrations/whatsapp";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,20 @@ export async function POST(req: Request) {
     );
   }
 
+  let whatsappTo: string | null = null;
+  if (parsed.data.channels.includes("whatsapp")) {
+    const allowlist = whatsappAllowlistFromEnv();
+    const requested = parsed.data.whatsappTo?.trim() || allowlist.defaultTo || "";
+    const check = assertWhatsAppDestinationAllowed(
+      requested,
+      allowlist.destinations.map((entry) => entry.to),
+    );
+    if (!check.ok) {
+      return NextResponse.json({ error: check.error }, { status: 400 });
+    }
+    whatsappTo = check.to;
+  }
+
   const job = await createDeskJob({
     title: parsed.data.title,
     topic: parsed.data.topic,
@@ -42,6 +57,7 @@ export async function POST(req: Request) {
     offerCta: parsed.data.offerCta,
     channels: parsed.data.channels,
     dueAt: parsed.data.dueAt ?? null,
+    whatsappTo,
     actorEmail: gate.email,
   });
   return NextResponse.json({ job }, { status: 201 });
