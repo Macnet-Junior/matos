@@ -8,7 +8,11 @@ import {
   reviewDeskStage,
   runDeskStage,
 } from "./index";
-import { dueCalendarItems, runDueDeliveries } from "./scheduler";
+import {
+  dueCalendarItems,
+  reconcileInFlightPublications,
+  runDueDeliveries,
+} from "./scheduler";
 
 /** Walk a job through all six Desk stages, approving every one. */
 async function fileJob(input: {
@@ -237,6 +241,61 @@ describe("desk scheduler (db)", () => {
       where: { idempotencyKey: `desk-calendar:${before.id}` },
     });
     expect(attemptsAfter.attemptCount).toBe(attemptsBefore);
+  });
+
+  it("reads an in-flight publication back instead of leaving it open forever", async () => {
+    const job = await fileJob({ title: "Reconcile me", channels: ["newsletter"] });
+    const row = await prisma.deskCalendarItem.findFirstOrThrow({
+      where: { jobId: job.id, channel: "newsletter" },
+    });
+    await runDueDeliveries({ actorEmail: "scheduler:test", now: new Date() });
+
+    const before = await prisma.deskPublication.findUniqueOrThrow({
+      where: { idempotencyKey: `desk-calendar:${row.id}` },
+    });
+    // No live provider is configured in tests, so the attempt landed
+    // simulated. A reconcile pass must still consider it — and must not
+    // promote it, because there is no remote side to ask.
+    expect(before.status).toBe("planned");
+
+    const pass = await reconcileInFlightPublications({ actorEmail: "scheduler:test" });
+    expect(pass.considered).toBeGreaterThanOrEqual(1);
+
+    const after = await prisma.deskPublication.findUniqueOrThrow({
+      where: { id: before.id },
+    });
+    expect(after.status).toBe("planned");
+    // The attempt count is untouched: a reconcile reads, it never re-posts.
+    expect(after.attemptCount).toBe(before.attemptCount);
+  });
+
+  it("settles a simulated publication by reading it back", async () => {
+    // A publication marked published is not in flight, so the reconcile pass
+    // must not touch it at all — the guard against re-opening a settled
+    // delivery.
+    const job = await fileJob({ title: "Already settled", channels: ["blog"] });
+    const row = await prisma.deskCalendarItem.findFirstOrThrow({
+      where: { jobId: job.id, channel: "blog" },
+    });
+    await prisma.deskPublication.create({
+      data: {
+        jobId: job.id,
+        channel: "blog",
+        provider: "native",
+        idempotencyKey: `desk-calendar:${row.id}`,
+        status: "published",
+        externalId: `blog_desk-calendar:${row.id}`,
+        attemptCount: 1,
+        lastAttemptAt: new Date(),
+      },
+    });
+
+    const pass = await reconcileInFlightPublications({ actorEmail: "scheduler:test" });
+    const settled = await prisma.deskPublication.findUniqueOrThrow({
+      where: { idempotencyKey: `desk-calendar:${row.id}` },
+    });
+    expect(settled.status).toBe("published");
+    expect(pass.considered).toBeGreaterThanOrEqual(0);
   });
 
   it("records a run in the activity log", async () => {

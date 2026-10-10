@@ -1,6 +1,9 @@
 import { prisma } from "@matos/db";
 import { appendActivity } from "@/lib/map-data";
-import { publishDeskCalendarItem } from "@/lib/content-publications";
+import {
+  publishDeskCalendarItem,
+  reconcileDeskPublication,
+} from "@/lib/content-publications";
 
 /**
  * The scheduler — what turns a `planned` calendar item into a delivery.
@@ -44,6 +47,17 @@ import { publishDeskCalendarItem } from "@/lib/content-publications";
  * would just fail on a timer. It stays for a human to see.
  */
 const ACTED_ON_STATUSES = ["published", "failed", "simulated"] as const;
+
+/**
+ * Statuses that mean "the delivery attempt has been made but its outcome is
+ * still open": the publisher accepted a post for a future time, or the remote
+ * side has not reported back yet. These are not due — re-running the publisher
+ * on them would post twice — but they *are* the rows a reconcile pass has to
+ * look at, because a scheduled post that went out at 09:00 would otherwise sit
+ * at `planned` forever and the Calendar would keep showing a post that already
+ * left.
+ */
+const IN_FLIGHT_STATUSES = ["planned", "publishing", "scheduled"] as const;
 
 /** Items the scheduler is willing to act on, oldest first. */
 export async function dueCalendarItems(input: {
@@ -225,6 +239,43 @@ export async function runDueDeliveries(input: {
   }
 
   return outcome;
+}
+
+/**
+ * Read back everything already in flight, once.
+ *
+ * The complement of `runDueDeliveries`: that one starts attempts, this one
+ * finishes them. Separated because the two must never be confused — a
+ * reconcile that delivered would double-post, and a delivery pass that
+ * reconciled would leave scheduled posts unstarted. Both run on the same tick.
+ *
+ * A simulated publication is left alone: `reconcileDeskPublication` reads
+ * `simulated` from the stored meta and returns without polling, so there is
+ * nothing to ask and nothing to promote.
+ */
+export async function reconcileInFlightPublications(input: {
+  actorEmail: string;
+  limit?: number;
+}): Promise<{ considered: number; settled: number; stillOpen: number }> {
+  const rows = await prisma.deskPublication.findMany({
+    where: { status: { in: [...IN_FLIGHT_STATUSES] } },
+    orderBy: { lastAttemptAt: "asc" },
+    take: input.limit ?? 25,
+    select: { id: true },
+  });
+  let settled = 0;
+  let stillOpen = 0;
+  for (const row of rows) {
+    const updated = await reconcileDeskPublication({
+      publicationId: row.id,
+      actorEmail: input.actorEmail,
+    });
+    // `planned` coming back means the remote side still has not reported;
+    // anything terminal is a delivery whose outcome is now known.
+    if (updated.status === "published" || updated.status === "failed") settled += 1;
+    else stillOpen += 1;
+  }
+  return { considered: rows.length, settled, stillOpen };
 }
 
 function parsePackageFlag(raw: string): { fallback: boolean } {
