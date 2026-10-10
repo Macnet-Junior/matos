@@ -37,7 +37,7 @@ Drafts stay in this browser (`localStorage`). Nothing is uploaded.
 
 Skillwright is the only code that calls Gemini to turn a YouTube link into a skill. Desk is where the link is pasted (a job’s Sources panel). Desk imports this module; it does not have its own Gemini client.
 
-Set `GEMINI_API_KEY` in `apps/web/.env.local`. That is your key — Google bills it. Optional `GEMINI_MODEL` (default `gemini-3.8-flash`). Gemini is given the YouTube URL directly (`file_data.file_uri`). If the call fails or the reply is not a skill file, the link stays unfinished and can be retried. It does not become a watched skill. A pasted transcript uses the same draft and grade when the video cannot be read.
+Set `GEMINI_API_KEY` in `apps/web/.env.local` (a user env var works too). That is your key — Google bills it. Optional `GEMINI_MODEL` (default `gemini-3.8-flash`). Gemini is given the YouTube URL directly (`file_data.file_uri`) at low media resolution and half a frame per second, so a normal video can finish. Desk returns Processing immediately and lets that call run in the background for up to ten minutes. If the call fails, the video is too long, or the reply is not a skill file, the link stays unfinished and can be retried. It does not become a watched skill. A pasted transcript uses the same draft and grade when the video cannot be read. A YouTube address in that box is still read as a video.
 
 ## Where a finished skill goes
 

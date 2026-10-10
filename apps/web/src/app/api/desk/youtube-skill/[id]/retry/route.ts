@@ -15,11 +15,11 @@ export async function POST(
 
   const { id } = await ctx.params;
   try {
-    const outcome = await retryYoutubeSkill({
+    const started = await retryYoutubeSkill({
       sourceId: id,
       actorEmail: gate.email,
     });
-    return NextResponse.json(outcome);
+    return NextResponse.json({ source: started.source, grade: started.grade });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Could not retry";
     const status = err instanceof YoutubeSkillInputError && message === "Source not found" ? 404 : 400;

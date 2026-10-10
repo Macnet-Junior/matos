@@ -5,7 +5,7 @@ import { prisma } from "@matos/db";
 import { assertIsolatedTestDatabase } from "@/test/db-fixtures";
 import { createDeskJob, runDeskStage } from "./index";
 import { sourceSegments } from "./sources";
-import { retryYoutubeSkill, startYoutubeSkill } from "./youtube-source";
+import { reapAbandonedYoutubeReads, retryYoutubeSkill, startYoutubeSkill } from "./youtube-source";
 
 /**
  * Gemini is mocked. These tests are about the promise the desk makes: a parsed
@@ -96,7 +96,7 @@ describe("youtube skill drafts (db)", () => {
     const created = await job();
     let sawProcessing = false;
 
-    const done = await startYoutubeSkill({
+    const started = await startYoutubeSkill({
       jobId: created.id,
       actorEmail: OWNER,
       title: "Episode 12",
@@ -112,6 +112,8 @@ describe("youtube skill drafts (db)", () => {
         }) as typeof fetch,
       },
     });
+    expect(started.source.status).toBe("processing");
+    const done = await started.settled;
 
     expect(sawProcessing).toBe(true);
     expect(done.source.status).toBe("transcribed");
@@ -142,15 +144,17 @@ describe("youtube skill drafts (db)", () => {
   it("leaves a failed Gemini call retryable and unread", async () => {
     const skillsBefore = await prisma.skill.count();
     const created = await job();
-    const failed = await startYoutubeSkill({
-      jobId: created.id,
-      actorEmail: OWNER,
-      youtubeUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-      deps: {
-        env: { GEMINI_API_KEY: KEY },
-        fetchImpl: (async () => new Response(`leak ${KEY}`, { status: 500 })) as typeof fetch,
-      },
-    });
+    const failed = await (
+      await startYoutubeSkill({
+        jobId: created.id,
+        actorEmail: OWNER,
+        youtubeUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        deps: {
+          env: { GEMINI_API_KEY: KEY },
+          fetchImpl: (async () => new Response(`leak ${KEY}`, { status: 500 })) as typeof fetch,
+        },
+      })
+    ).settled;
 
     expect(failed.source.status).toBe("failed");
     expect(failed.source.skillReadiness).toBe("unfinished");
@@ -162,11 +166,13 @@ describe("youtube skill drafts (db)", () => {
     expect(await sourceSegments(failed.source.id)).toBeNull();
     expect(await prisma.skill.count()).toBe(skillsBefore);
 
-    const retried = await retryYoutubeSkill({
-      sourceId: failed.source.id,
-      actorEmail: OWNER,
-      deps: { env: { GEMINI_API_KEY: KEY }, fetchImpl: fetchOk() },
-    });
+    const retried = await (
+      await retryYoutubeSkill({
+        sourceId: failed.source.id,
+        actorEmail: OWNER,
+        deps: { env: { GEMINI_API_KEY: KEY }, fetchImpl: fetchOk() },
+      })
+    ).settled;
     expect(retried.source.status).toBe("transcribed");
     expect(retried.source.skillReadiness).toBe("draft");
     expect(retried.grade?.firstProblem).toBe("hook");
@@ -175,21 +181,23 @@ describe("youtube skill drafts (db)", () => {
 
   it("does not turn a bad parse into a watched or transcribed skill", async () => {
     const created = await job();
-    const bad = await startYoutubeSkill({
-      jobId: created.id,
-      actorEmail: OWNER,
-      youtubeUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-      deps: {
-        env: { GEMINI_API_KEY: KEY },
-        fetchImpl: (async () =>
-          new Response(
-            JSON.stringify({
-              candidates: [{ content: { parts: [{ text: "not json and not a skill" }] } }],
-            }),
-            { status: 200, headers: { "content-type": "application/json" } },
-          )) as typeof fetch,
-      },
-    });
+    const bad = await (
+      await startYoutubeSkill({
+        jobId: created.id,
+        actorEmail: OWNER,
+        youtubeUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        deps: {
+          env: { GEMINI_API_KEY: KEY },
+          fetchImpl: (async () =>
+            new Response(
+              JSON.stringify({
+                candidates: [{ content: { parts: [{ text: "not json and not a skill" }] } }],
+              }),
+              { status: 200, headers: { "content-type": "application/json" } },
+            )) as typeof fetch,
+        },
+      })
+    ).settled;
 
     expect(bad.source.status).toBe("failed");
     expect(bad.source.status).not.toBe("transcribed");
@@ -232,23 +240,25 @@ describe("youtube skill drafts (db)", () => {
   it("grades a pasted transcript through the same draft path", async () => {
     const created = await job();
     let sawFile = false;
-    const done = await startYoutubeSkill({
-      jobId: created.id,
-      actorEmail: OWNER,
-      title: "Pasted episode",
-      transcript: PASTE,
-      deps: {
-        env: { GEMINI_API_KEY: KEY },
-        fetchImpl: (async (_url: string, init?: RequestInit) => {
-          const body = String(init?.body ?? "");
-          sawFile = body.includes("file_data");
-          return envelope({
-            ...GOOD_SKILL,
-            segments: [{ startMs: 0, endMs: 1, text: "invented line the model made up" }],
-          });
-        }) as typeof fetch,
-      },
-    });
+    const done = await (
+      await startYoutubeSkill({
+        jobId: created.id,
+        actorEmail: OWNER,
+        title: "Pasted episode",
+        transcript: PASTE,
+        deps: {
+          env: { GEMINI_API_KEY: KEY },
+          fetchImpl: (async (_url: string, init?: RequestInit) => {
+            const body = String(init?.body ?? "");
+            sawFile = body.includes("file_data");
+            return envelope({
+              ...GOOD_SKILL,
+              segments: [{ startMs: 0, endMs: 1, text: "invented line the model made up" }],
+            });
+          }) as typeof fetch,
+        },
+      })
+    ).settled;
 
     expect(sawFile).toBe(false);
     expect(done.source.status).toBe("transcribed");
@@ -273,5 +283,202 @@ describe("youtube skill drafts (db)", () => {
       }),
     ).rejects.toThrow(/not a YouTube/);
     expect(await prisma.deskSource.count({ where: { jobId: created.id } })).toBe(0);
+  });
+
+  it("labels a YouTube link as YouTube, shows Processing, then Done", async () => {
+    const created = await job();
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const skillsBefore = await prisma.skill.count();
+    const started = await startYoutubeSkill({
+      jobId: created.id,
+      actorEmail: OWNER,
+      youtubeUrl: "https://www.youtube.com/watch?v=eWKY0OnPByg",
+      deps: {
+        env: { GEMINI_API_KEY: KEY },
+        fetchImpl: (async () => {
+          await gate;
+          return envelope(GOOD_SKILL);
+        }) as typeof fetch,
+      },
+    });
+
+    expect(started.source.status).toBe("processing");
+    expect(started.source.title).toBe("YouTube eWKY0OnPByg");
+    expect(started.source.title).not.toBe("Pasted transcript");
+    expect(started.source.origin).toBe("https://www.youtube.com/watch?v=eWKY0OnPByg");
+    expect(started.source.origin).not.toBe("Pasted transcript");
+    expect(started.source.skillDraft).toBe("");
+    expect(started.source.skillReadiness).toBe("unfinished");
+    expect(started.grade).toBeNull();
+    expect(await prisma.skill.count()).toBe(skillsBefore);
+
+    release();
+    const done = await started.settled;
+    expect(done.source.status).toBe("transcribed");
+    expect(done.source.skillReadiness).toBe("draft");
+    expect(done.source.skillDraft).toMatch(/not a watched skill/i);
+    expect(done.source.skillDraft).not.toContain(KEY);
+    expect(done.source.origin).toBe("https://www.youtube.com/watch?v=eWKY0OnPByg");
+    expect(await prisma.skill.count()).toBe(skillsBefore);
+    expect(await prisma.skill.findFirst({ where: { slug: "faceless-workflow" } })).toBeNull();
+  });
+
+  it("labels a YouTube address pasted as a transcript as a YouTube source", async () => {
+    const created = await job();
+    let sawFile = false;
+    const done = await (
+      await startYoutubeSkill({
+        jobId: created.id,
+        actorEmail: OWNER,
+        transcript: "https://www.youtube.com/watch?v=eWKY0OnPByg",
+        deps: {
+          env: { GEMINI_API_KEY: KEY },
+          fetchImpl: (async (_url: string, init?: RequestInit) => {
+            sawFile = String(init?.body ?? "").includes("file_data");
+            return envelope(GOOD_SKILL);
+          }) as typeof fetch,
+        },
+      })
+    ).settled;
+
+    expect(sawFile).toBe(true);
+    expect(done.source.origin).toBe("https://www.youtube.com/watch?v=eWKY0OnPByg");
+    expect(done.source.title).toBe("YouTube eWKY0OnPByg");
+    expect(done.source.title).not.toBe("Pasted transcript");
+    expect(done.source.origin).not.toBe("Pasted transcript");
+    expect(done.source.provider).toBe("gemini");
+    expect(done.source.status).toBe("transcribed");
+  });
+
+  it("turns a timed-out YouTube read into a failed retryable source and not a skill", async () => {
+    const skillsBefore = await prisma.skill.count();
+    const created = await job();
+    const failed = await (
+      await startYoutubeSkill({
+        jobId: created.id,
+        actorEmail: OWNER,
+        youtubeUrl: "https://www.youtube.com/watch?v=eWKY0OnPByg",
+        deps: {
+          env: { GEMINI_API_KEY: KEY },
+          timeoutMs: 30,
+          fetchImpl: (async (_url: string, init?: RequestInit) => {
+            if (!init?.signal) throw new Error("missing abort signal");
+            const err = new Error(`aborted ${KEY}`);
+            err.name = "TimeoutError";
+            throw err;
+          }) as typeof fetch,
+        },
+      })
+    ).settled;
+
+    expect(failed.source.status).toBe("failed");
+    expect(failed.source.skillReadiness).toBe("unfinished");
+    expect(failed.source.skillDraft).toBe("");
+    expect(failed.source.transcript).toBe("");
+    expect(failed.source.title).toBe("YouTube eWKY0OnPByg");
+    expect(failed.source.origin).toBe("https://www.youtube.com/watch?v=eWKY0OnPByg");
+    expect(failed.source.error).toMatch(/took too long/i);
+    expect(failed.source.error).toMatch(/paste a transcript/i);
+    expect(failed.source.error).not.toContain(KEY);
+    expect(failed.grade).toBeNull();
+    expect(await sourceSegments(failed.source.id)).toBeNull();
+    expect(await prisma.skill.count()).toBe(skillsBefore);
+
+    const retried = await (
+      await retryYoutubeSkill({
+        sourceId: failed.source.id,
+        actorEmail: OWNER,
+        deps: { env: { GEMINI_API_KEY: KEY }, fetchImpl: fetchOk() },
+      })
+    ).settled;
+    expect(retried.source.status).toBe("transcribed");
+    expect(retried.source.skillReadiness).toBe("draft");
+    expect(await prisma.skill.count()).toBe(skillsBefore);
+  });
+
+  it("rejects bad input in plain language and does not create a source", async () => {
+    const created = await job();
+    const cases: Array<{ youtubeUrl?: string; transcript?: string; pattern: RegExp }> = [
+      { youtubeUrl: "https://www.youtube.com/playlist?list=PLabcdefghij", pattern: /video id/i },
+      { youtubeUrl: "not a link", pattern: /not a YouTube link/i },
+      { youtubeUrl: "https://youtu.be/dQw4w9WgXcQ", transcript: PASTE, pattern: /not both/i },
+      { pattern: /Paste a YouTube link or a transcript/i },
+      { transcript: "   ", pattern: /Paste a YouTube link or a transcript/i },
+    ];
+    for (const item of cases) {
+      await expect(
+        startYoutubeSkill({
+          jobId: created.id,
+          actorEmail: OWNER,
+          ...(item.youtubeUrl ? { youtubeUrl: item.youtubeUrl } : {}),
+          ...(item.transcript !== undefined ? { transcript: item.transcript } : {}),
+          deps: { env: { GEMINI_API_KEY: KEY }, fetchImpl: fetchOk() },
+        }),
+      ).rejects.toThrow(item.pattern);
+    }
+    expect(await prisma.deskSource.count({ where: { jobId: created.id } })).toBe(0);
+  });
+
+  it("accepts a share-sheet paste as a YouTube source", async () => {
+    const created = await job();
+    const done = await (
+      await startYoutubeSkill({
+        jobId: created.id,
+        actorEmail: OWNER,
+        youtubeUrl: "Worth a watch\nhttps://youtu.be/eWKY0OnPByg?si=abc",
+        deps: { env: { GEMINI_API_KEY: KEY }, fetchImpl: fetchOk() },
+      })
+    ).settled;
+    expect(done.source.origin).toBe("https://www.youtube.com/watch?v=eWKY0OnPByg");
+    expect(done.source.title).toBe("YouTube eWKY0OnPByg");
+    expect(done.source.status).toBe("transcribed");
+  });
+
+  it("fails an abandoned processing row without touching an in-flight read", async () => {
+    const created = await job();
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const started = await startYoutubeSkill({
+      jobId: created.id,
+      actorEmail: OWNER,
+      title: "Still reading",
+      youtubeUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      deps: {
+        env: { GEMINI_API_KEY: KEY },
+        fetchImpl: (async () => {
+          await gate;
+          return envelope(GOOD_SKILL);
+        }) as typeof fetch,
+      },
+    });
+    const abandoned = await prisma.deskSource.create({
+      data: {
+        kind: "video",
+        title: "Left behind",
+        origin: "https://www.youtube.com/watch?v=eWKY0OnPByg",
+        status: "processing",
+        jobId: created.id,
+        createdBy: OWNER,
+        skillReadiness: "unfinished",
+      },
+    });
+
+    await reapAbandonedYoutubeReads(OWNER, { processStartedAt: Date.now() + 60_000 });
+    const live = await prisma.deskSource.findUnique({ where: { id: started.source.id } });
+    const dead = await prisma.deskSource.findUnique({ where: { id: abandoned.id } });
+    expect(live?.status).toBe("processing");
+    expect(dead?.status).toBe("failed");
+    expect(dead?.skillReadiness).toBe("unfinished");
+    expect(dead?.skillDraft).toBe("");
+    expect(dead?.error).toMatch(/stopped before it finished/i);
+
+    release();
+    const done = await started.settled;
+    expect(done.source.status).toBe("transcribed");
   });
 });

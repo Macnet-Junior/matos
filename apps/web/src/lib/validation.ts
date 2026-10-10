@@ -242,9 +242,42 @@ export const createDeskSourceSchema = z.object({
 export const youtubeSkillSchema = z.object({
   jobId: z.string().trim().min(1).max(64),
   title: z.string().trim().max(160).optional(),
-  youtubeUrl: z.string().trim().max(600).optional(),
-  transcript: z.string().max(100_000).optional(),
+  // Share-sheet pastes include a title line. 600 characters rejected those
+  // before the YouTube parser could pull the address out, and the panel only
+  // showed "Validation failed".
+  youtubeUrl: z.string().trim().max(2_000).optional(),
+  transcript: z.string().max(200_000).optional(),
 });
+
+/**
+ * The sources panel shows `error` and ignores Zod's issue tree. These
+ * sentences are the 400 body.
+ */
+export function youtubeSkillRequestError(body: unknown, error: z.ZodError): string {
+  if (body === null || body === undefined || typeof body !== "object" || Array.isArray(body)) {
+    return "That request could not be read. Try again.";
+  }
+  const issue = error.issues[0];
+  if (!issue) return "Check the link or the transcript and try again.";
+  const field = String(issue.path[0] ?? "");
+  if (field === "youtubeUrl") {
+    return issue.code === "too_big"
+      ? "That link is too long. Paste just the YouTube address, not the title and description around it."
+      : "That is not a YouTube link. Paste the full address from the browser.";
+  }
+  if (field === "transcript") {
+    return issue.code === "too_big"
+      ? "That transcript is too long to send. Paste a shorter one, or use the YouTube link."
+      : "Paste the transcript or the words from the video. A blank note cannot become a skill.";
+  }
+  if (field === "title") {
+    return "That title is too long. Keep it under 160 characters.";
+  }
+  if (field === "jobId") {
+    return "Open a desk job, then paste the link again.";
+  }
+  return "Check the link or the transcript and try again.";
+}
 
 export const ingestDeskSourceSchema = z.object({
   // A file path on the machine the desk runs on. The route does not accept a
