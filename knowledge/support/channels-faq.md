@@ -10,7 +10,7 @@ OAuth2 PKCE start/callback is scaffolded. Draft listings can be simulated until 
 
 ## WhatsApp
 
-Hard allowlist: only `WHATSAPP_GROUP_OR_TO` may be messaged. Review gate required. No unrestricted auto-DM.
+Hard allowlist: only destinations in `WHATSAPP_ALLOWED_TO` (and the legacy `WHATSAPP_GROUP_OR_TO` default) may be messaged. Cap 10. Review gate required. No unrestricted auto-DM.
 
 ## Auto-response
 

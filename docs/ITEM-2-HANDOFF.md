@@ -75,12 +75,14 @@ the app; only the domain changes.
 WHATSAPP_TOKEN=...
 WHATSAPP_PHONE_NUMBER_ID=...
 WHATSAPP_GROUP_OR_TO=...
+WHATSAPP_ALLOWED_TO=Career path|+237..., Shop|+237...
 ```
 
-**Hard boundary:** the code will only message the number in
-`WHATSAPP_GROUP_OR_TO`. This is deliberate — a misconfigured WhatsApp publisher
-can message strangers, so it is restricted to one destination by design. Do not
-widen it without a deliberate code change.
+**Hard boundary:** the code will only message destinations on
+`WHATSAPP_ALLOWED_TO` (comma-separated, optional `label|number`, cap 10).
+`WHATSAPP_GROUP_OR_TO` still works as a one-item list and is the default when a
+post does not name a destination. Anything else is rejected and not sent. There
+is no wildcard. Do not add an anyone option.
 
 ## How to check it worked
 

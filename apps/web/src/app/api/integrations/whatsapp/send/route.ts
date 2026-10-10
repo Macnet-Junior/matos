@@ -8,6 +8,7 @@ import {
 } from "@/lib/integrations/whatsapp";
 import { appendActivity } from "@/lib/map-data";
 import { recordUsageEvent } from "@/lib/ops/usage";
+import { recordProviderEvent } from "@/lib/content-observability";
 
 export const dynamic = "force-dynamic";
 
@@ -39,18 +40,34 @@ export async function POST(req: Request) {
   }
 
   const cfg = whatsappConfigFromEnv();
+  const allowed = cfg.allowlist.destinations.map((entry) => entry.to);
   const to = (body.to ?? cfg.allowedTo ?? "").trim();
-  const check = assertWhatsAppDestinationAllowed(to, cfg.allowedTo);
+  const check = assertWhatsAppDestinationAllowed(to, allowed);
   if (!check.ok) {
+    recordProviderEvent({
+      provider: "whatsapp",
+      kind: "delivery",
+      ok: false,
+      simulated: false,
+      reason: "destination_rejected",
+    });
+    await appendActivity({
+      action: "whatsapp.send",
+      entityType: "integration",
+      entityId: "whatsapp",
+      summary: `WhatsApp blocked: ${check.error}`,
+      actorEmail: gate.email,
+      payload: { simulated: false, ok: false, reason: "destination_rejected" },
+    });
     return NextResponse.json({ error: check.error }, { status: 403 });
   }
 
   const dryRun = body.dryRun !== false && !(cfg.token && cfg.phoneNumberId);
   if (dryRun || !cfg.token || !cfg.phoneNumberId) {
     const result = simulateWhatsAppSend({
-      to,
+      to: check.to,
       text: body.text,
-      allowedTo: cfg.allowedTo,
+      allowedTo: allowed,
       reviewGateApproved: true,
     });
     await appendActivity({
@@ -78,10 +95,10 @@ export async function POST(req: Request) {
   const client = new WhatsAppClient({
     token: cfg.token,
     phoneNumberId: cfg.phoneNumberId,
-    allowedTo: cfg.allowedTo!,
+    allowedTo: allowed,
   });
   const result = await client.sendText({
-    to,
+    to: check.to,
     text: body.text,
     reviewGateApproved: true,
   });

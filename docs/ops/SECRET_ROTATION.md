@@ -14,7 +14,7 @@ MatOS keeps integration credentials and auth secrets on the server. Nothing in t
 | `WHATSAPP_TOKEN` | Host env | When the Cloud API token expires or is exposed |
 | `OPENAI_API_KEY` | Host env | On provider rotation |
 
-`WHATSAPP_GROUP_OR_TO` is an allowlist, not a secret, but changing it is a production change: WhatsApp delivery refuses every other destination.
+`WHATSAPP_GROUP_OR_TO` and `WHATSAPP_ALLOWED_TO` are an allowlist, not secrets, but changing them is a production change: WhatsApp delivery refuses every destination that is not on the list.
 
 ## Rotation steps
 

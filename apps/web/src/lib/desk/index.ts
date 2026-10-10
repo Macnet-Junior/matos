@@ -404,6 +404,7 @@ export async function createDeskJob(input: {
   offerCta: string;
   channels: string[];
   dueAt?: string | null;
+  whatsappTo?: string | null;
   actorEmail: string;
 }): Promise<DeskJobDTO> {
   const title =
@@ -417,6 +418,7 @@ export async function createDeskJob(input: {
       audience: input.audience.trim(),
       offerCta: input.offerCta.trim(),
       channelsJson: JSON.stringify(input.channels),
+      whatsappTo: input.channels.includes("whatsapp") ? (input.whatsappTo?.trim() ?? "") : "",
       dueAt: input.dueAt ? new Date(input.dueAt) : null,
       stage: "scout",
       status: "draft",
@@ -713,7 +715,13 @@ async function materializeClock(jobId: string, channels: string[], dueAt: Date |
         body: stored.text,
         scheduledAt: when,
         status: validation.ok ? (fallback ? "fallback_brief" : "planned") : "invalid",
-        packageJson: JSON.stringify({ ...stored, fallback }),
+        packageJson: JSON.stringify({
+          ...stored,
+          fallback,
+          ...(channel === "whatsapp" && job.whatsappTo
+            ? { destination: job.whatsappTo }
+            : {}),
+        }),
         simulated: false,
       },
     });

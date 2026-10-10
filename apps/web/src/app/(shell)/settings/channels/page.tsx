@@ -17,7 +17,9 @@ export default async function Page() {
         <p className="mt-1.5 max-w-2xl text-xs text-matos-muted">
           Connect Late.dev, Etsy, or WhatsApp. Keys stay on the server. Without
           a key, publish stays simulated and is labeled that way. WhatsApp only
-          sends to the allowlisted destination.
+          sends to approved destinations. The card shows how many are
+          configured, with numbers masked, and whether delivery is
+          live-configured or simulated.
         </p>
       </div>
       <div className="overflow-auto p-[22px]">

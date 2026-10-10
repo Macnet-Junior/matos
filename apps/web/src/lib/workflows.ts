@@ -447,7 +447,7 @@ async function attemptChannelPublish(input: {
     const result = simulateWhatsAppSend({
       to: dest || "__missing__",
       text: input.purpose?.trim() || `MatOS: ${input.skillTitle}`,
-      allowedTo: cfg.allowedTo,
+      allowedTo: cfg.allowlist.destinations.map((entry) => entry.to),
       reviewGateApproved: canSimulatePublish(input.gate),
     });
     if (result.ok) {
@@ -833,6 +833,7 @@ export function channelStubs(): ChannelDTO[] {
         disconnected: "yes",
       },
       allowedDestination: null,
+      whatsappAllowlist: null,
     },
     {
       id: "etsy",
@@ -852,12 +853,13 @@ export function channelStubs(): ChannelDTO[] {
         disconnected: "yes",
       },
       allowedDestination: null,
+      whatsappAllowlist: null,
     },
     {
       id: "whatsapp",
       name: "WhatsApp",
       status: "disconnected",
-      note: "Career path / content creation monetization only.",
+      note: "Approved destinations only. Without a list, delivery stays simulated.",
       phase: "",
       connectMode: "env",
       maskedHint: null,
@@ -872,7 +874,14 @@ export function channelStubs(): ChannelDTO[] {
       },
       allowedDestination: {
         id: null,
-        label: "Career path and content creation monetization",
+        label: "No approved destinations (set WHATSAPP_ALLOWED_TO or WHATSAPP_GROUP_OR_TO)",
+      },
+      whatsappAllowlist: {
+        count: 0,
+        mode: "simulated",
+        overCap: false,
+        rejectedCount: 0,
+        destinations: [],
       },
     },
   ];

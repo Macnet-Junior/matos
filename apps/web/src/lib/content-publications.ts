@@ -99,7 +99,8 @@ async function publisherFor(channel: ContentPlatform): Promise<{
   return {
     provider: "whatsapp",
     primary: new WhatsAppContentPublisher({
-      allowedTo: whatsapp.allowedTo,
+      allowedTo: whatsapp.allowlist.destinations.map((entry) => entry.to),
+      defaultTo: whatsapp.allowedTo,
       token: whatsapp.token,
       phoneNumberId: whatsapp.phoneNumberId,
     }),
@@ -138,6 +139,11 @@ export async function publishDeskCalendarItem(input: {
   }
 
   const { provider, primary } = await publisherFor(item.channel);
+  const packageRecord = parseJsonObject(item.packageJson);
+  const requestedTo =
+    item.channel === "whatsapp" && typeof packageRecord.destination === "string"
+      ? packageRecord.destination
+      : undefined;
   const publication = await prisma.deskPublication.upsert({
     where: { idempotencyKey },
     create: {
@@ -169,6 +175,7 @@ export async function publishDeskCalendarItem(input: {
         idempotencyKey,
         scheduledFor: item.scheduledAt.toISOString(),
         approved: true,
+        to: requestedTo,
       },
       { maxAttempts: 3, baseDelayMs: 50 },
     );
@@ -206,6 +213,16 @@ export async function publishDeskCalendarItem(input: {
         error.message === "package_invalid")
         ? error.message
         : "provider_error";
+    if (code === "destination_rejected") {
+      await appendActivity({
+        action: "desk.publication.blocked",
+        entityType: "desk_publication",
+        entityId: publication.id,
+        summary: "WhatsApp blocked: that number is not on the approved list",
+        actorEmail: input.actorEmail,
+        payload: { channel: item.channel, reason: "destination_rejected" },
+      });
+    }
     return prisma.deskPublication.update({
       where: { id: publication.id },
       data: { status: "failed", error: code },

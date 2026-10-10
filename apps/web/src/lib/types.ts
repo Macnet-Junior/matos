@@ -244,4 +244,12 @@ export interface ChannelDTO {
   meta: Record<string, unknown>;
   coverage: ChannelCoverage;
   allowedDestination: { id: string | null; label: string } | null;
+  /** Approved WhatsApp destinations safe to render. Null for other channels. */
+  whatsappAllowlist?: {
+    count: number;
+    mode: "live-configured" | "simulated";
+    overCap: boolean;
+    rejectedCount: number;
+    destinations: { label: string | null; masked: string }[];
+  } | null;
 }

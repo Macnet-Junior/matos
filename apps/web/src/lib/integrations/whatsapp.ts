@@ -1,7 +1,31 @@
 /**
- * WhatsApp Cloud API wrapper with HARD destination allowlist.
- * Only WHATSAPP_GROUP_OR_TO may be messaged — all other destinations rejected.
+ * WhatsApp Cloud API wrapper with a hard destination allowlist.
+ * Only destinations on WHATSAPP_ALLOWED_TO, plus the legacy WHATSAPP_GROUP_OR_TO
+ * entry, may be messaged. Anything else is rejected, logged, and never sent.
  */
+
+import { recordProviderEvent } from "../content-observability";
+import {
+  assertWhatsAppDestinationAllowed,
+  whatsappAllowlistFromEnv,
+  type WhatsAppAllowlist,
+} from "./whatsapp-destinations";
+
+export {
+  assertWhatsAppDestinationAllowed,
+  maskWhatsAppDestination,
+  normalizeWhatsAppDestination,
+  parseWhatsAppAllowlist,
+  publicWhatsAppAllowlist,
+  whatsappAllowlistFromEnv,
+  whatsappDestinationChoices,
+  WHATSAPP_ALLOWED_DESTINATION_CAP,
+} from "./whatsapp-destinations";
+export type {
+  WhatsAppAllowlist,
+  WhatsAppDestination,
+  WhatsAppDestinationChoice,
+} from "./whatsapp-destinations";
 
 export type WhatsAppSendInput = {
   to: string;
@@ -21,71 +45,56 @@ export type WhatsAppSendResult = {
 export type WhatsAppClientOptions = {
   token: string;
   phoneNumberId: string;
-  /** Sole allowed destination (group or user id) */
-  allowedTo: string;
+  /** Approved destinations. A string is a one-item list (legacy). */
+  allowedTo: string | readonly string[];
   fetchImpl?: typeof fetch;
   graphBase?: string;
 };
 
 const GRAPH_BASE = "https://graph.facebook.com/v21.0";
 
+function logDestinationRejected(): void {
+  recordProviderEvent({
+    provider: "whatsapp",
+    kind: "delivery",
+    ok: false,
+    simulated: false,
+    reason: "destination_rejected",
+  });
+}
+
+/** Legacy single destination: WHATSAPP_GROUP_OR_TO, else the first approved entry. */
 export function whatsappAllowedDestination(): string | null {
-  const v = process.env.WHATSAPP_GROUP_OR_TO?.trim();
-  return v || null;
+  return whatsappAllowlistFromEnv().defaultTo;
 }
 
 export function whatsappConfigFromEnv(): {
   token: string | null;
   phoneNumberId: string | null;
+  /** Default destination when a post does not name one. */
   allowedTo: string | null;
+  allowlist: WhatsAppAllowlist;
 } {
+  const allowlist = whatsappAllowlistFromEnv();
   return {
     token: process.env.WHATSAPP_TOKEN?.trim() || null,
     phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID?.trim() || null,
-    allowedTo: whatsappAllowedDestination(),
+    allowedTo: allowlist.defaultTo,
+    allowlist,
   };
-}
-
-/**
- * HARD BOUNDARY: destination must exactly match configured allowlist.
- */
-export function assertWhatsAppDestinationAllowed(
-  to: string,
-  allowedTo: string | null | undefined,
-): { ok: true } | { ok: false; error: string } {
-  const dest = to.trim();
-  const allowed = (allowedTo ?? "").trim();
-  if (!allowed) {
-    return {
-      ok: false,
-      error:
-        "WhatsApp allowlist unset — set WHATSAPP_GROUP_OR_TO (Career path / content creation monetization only)",
-    };
-  }
-  if (!dest) {
-    return { ok: false, error: "WhatsApp destination required" };
-  }
-  if (dest !== allowed) {
-    return {
-      ok: false,
-      error:
-        "WhatsApp destination rejected — only the configured Career path / content creation monetization destination is allowed",
-    };
-  }
-  return { ok: true };
 }
 
 export class WhatsAppClient {
   private token: string;
   private phoneNumberId: string;
-  private allowedTo: string;
+  private allowedTo: readonly string[];
   private fetchImpl: typeof fetch;
   private graphBase: string;
 
   constructor(opts: WhatsAppClientOptions) {
     this.token = opts.token;
     this.phoneNumberId = opts.phoneNumberId;
-    this.allowedTo = opts.allowedTo;
+    this.allowedTo = typeof opts.allowedTo === "string" ? [opts.allowedTo] : opts.allowedTo;
     this.fetchImpl = opts.fetchImpl ?? fetch;
     this.graphBase = (opts.graphBase ?? GRAPH_BASE).replace(/\/$/, "");
   }
@@ -99,6 +108,7 @@ export class WhatsAppClient {
     }
     const check = assertWhatsAppDestinationAllowed(input.to, this.allowedTo);
     if (!check.ok) {
+      logDestinationRejected();
       return { ok: false, error: check.error };
     }
 
@@ -111,7 +121,7 @@ export class WhatsAppClient {
       },
       body: JSON.stringify({
         messaging_product: "whatsapp",
-        to: input.to.trim(),
+        to: check.to,
         type: "text",
         text: { body: input.text },
       }),
@@ -124,36 +134,52 @@ export class WhatsAppClient {
       return {
         ok: false,
         error: body.error?.message ?? `WhatsApp API ${res.status}`,
-        to: input.to.trim(),
+        to: check.to,
       };
     }
     return {
       ok: true,
       messageId: body.messages?.[0]?.id,
-      to: input.to.trim(),
+      to: check.to,
     };
   }
 }
 
 /**
- * ContentPublisher adapter. Destination is always the configured allowlist
- * value — caller-supplied destinations are ignored.
+ * ContentPublisher adapter. A named destination must be on the approved list.
+ * When a post does not name one, the legacy default (or the only entry) is used.
  */
 export class WhatsAppContentPublisher {
   constructor(
     private readonly opts: {
-      allowedTo: string | null;
+      allowedTo: string | readonly string[] | null;
+      defaultTo?: string | null;
       token?: string | null;
       phoneNumberId?: string | null;
       fetchImpl?: typeof fetch;
     },
   ) {}
 
+  private allowedList(): readonly string[] {
+    if (this.opts.allowedTo == null) return [];
+    return typeof this.opts.allowedTo === "string" ? [this.opts.allowedTo] : this.opts.allowedTo;
+  }
+
+  private destinationFor(requested: string | null | undefined): string {
+    const asked = (requested ?? "").trim();
+    if (asked) return asked;
+    const fallback = this.opts.defaultTo?.trim();
+    if (fallback) return fallback;
+    const list = this.allowedList();
+    return list.length === 1 ? list[0]! : "";
+  }
+
   async publish(input: {
     channel: string;
     body: string;
     idempotencyKey: string;
     approved?: boolean;
+    to?: string | null;
   }): Promise<{
     externalId: string;
     status: "planned" | "published";
@@ -162,15 +188,16 @@ export class WhatsAppContentPublisher {
   }> {
     if (input.channel !== "whatsapp") throw new Error("provider_error");
     if (!input.approved) throw new Error("approval_required");
-    const destination = (this.opts.allowedTo ?? "").trim();
-    const check = assertWhatsAppDestinationAllowed(destination, this.opts.allowedTo);
+    const destination = this.destinationFor(input.to);
+    const allowed = this.allowedList();
+    const check = assertWhatsAppDestinationAllowed(destination, allowed);
     if (!check.ok) throw new Error("destination_rejected");
 
     if (!this.opts.token || !this.opts.phoneNumberId) {
       const simulated = simulateWhatsAppSend({
-        to: destination,
+        to: check.to,
         text: input.body,
-        allowedTo: this.opts.allowedTo,
+        allowedTo: allowed,
         reviewGateApproved: true,
       });
       if (!simulated.ok || !simulated.messageId) throw new Error("destination_rejected");
@@ -185,11 +212,11 @@ export class WhatsAppContentPublisher {
     const client = new WhatsAppClient({
       token: this.opts.token,
       phoneNumberId: this.opts.phoneNumberId,
-      allowedTo: destination,
+      allowedTo: allowed,
       fetchImpl: this.opts.fetchImpl,
     });
     const result = await client.sendText({
-      to: destination,
+      to: check.to,
       text: input.body,
       reviewGateApproved: true,
     });
@@ -206,7 +233,7 @@ export class WhatsAppContentPublisher {
 export function simulateWhatsAppSend(input: {
   to: string;
   text: string;
-  allowedTo: string | null;
+  allowedTo: string | readonly string[] | null;
   reviewGateApproved: boolean;
 }): WhatsAppSendResult {
   if (!input.reviewGateApproved) {
@@ -217,12 +244,13 @@ export function simulateWhatsAppSend(input: {
   }
   const check = assertWhatsAppDestinationAllowed(input.to, input.allowedTo);
   if (!check.ok) {
+    logDestinationRejected();
     return { ok: false, error: check.error };
   }
   return {
     ok: true,
     simulated: true,
     messageId: `sim_wa_${Date.now()}`,
-    to: input.to.trim(),
+    to: check.to,
   };
 }
