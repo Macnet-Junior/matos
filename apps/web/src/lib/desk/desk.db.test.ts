@@ -166,6 +166,68 @@ describe("desk pipeline (db)", () => {
     expect(afterScout.status).toBe("draft");
   });
 
+  it("refuses a rejection filed against the wrong stage", async () => {
+    // The whole point of the stage assertion: a rejection recorded against the
+    // wrong stage would send the owner to fix the wrong skill, which is the
+    // failure the skill link exists to prevent. The API route can no longer
+    // recover the stage once the caller has moved on, so it is checked here.
+    const job = await createDeskJob({
+      title: "Stage assertion",
+      topic: "Reject against the wrong stage",
+      audience: "Operators",
+      offerCta: "Check the link",
+      channels: ["blog"],
+      actorEmail: "author@matos.local",
+    });
+    await runDeskStage({ jobId: job.id, actorEmail: "author@matos.local" });
+
+    await expect(
+      reviewDeskStage({
+        jobId: job.id,
+        action: "request_changes",
+        note: "wrong stage on purpose",
+        stage: "press",
+        actorEmail: "operator@matos.local",
+      }),
+    ).rejects.toThrow(/Stage mismatch/);
+
+    // The correct stage still works, and the recorded note survives.
+    const rejected = await reviewDeskStage({
+      jobId: job.id,
+      action: "request_changes",
+      note: "Scout reads like a content tip",
+      stage: "scout",
+      actorEmail: "operator@matos.local",
+    });
+    expect(rejected.status).toBe("changes_requested");
+    const stage = rejected.artifacts.find((a) => a.stage === "scout");
+    expect(stage?.reviewState).toBe("changes_requested");
+    expect(stage?.reviewNote).toBe("Scout reads like a content tip");
+  });
+
+  it("carries the responsible skill on the artifact it produced", async () => {
+    const job = await createDeskJob({
+      title: "Skill link",
+      topic: "Where does a bad draft come from",
+      audience: "Operators",
+      offerCta: "Fix the skill",
+      channels: ["blog"],
+      actorEmail: "author@matos.local",
+    });
+    const scouted = await runDeskStage({
+      jobId: job.id,
+      actorEmail: "author@matos.local",
+    });
+    const scout = scouted.artifacts.find((a) => a.stage === "scout");
+    // Scout is governed by Trend Radar, which the seed still marks planned, so
+    // the link has to say so rather than imply there is a skill to read. The
+    // destination stays real: the skills list, where the owner authors it.
+    expect(scout?.skill?.slug).toBe("trend-radar");
+    expect(scout?.skill?.missing).toBe(true);
+    expect(scout?.skill?.href).toBe("/skills");
+    expect(scout?.skill?.reason).toMatch(/operating problem/i);
+  });
+
   it("schedules calendar items on Clock approve and keeps inbox unsent", async () => {
     const job = await createDeskJob({
       title: "Clock + Echo path",

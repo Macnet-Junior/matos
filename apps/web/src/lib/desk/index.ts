@@ -8,6 +8,11 @@ import { getDeskProvider } from "./provider";
 import { sourceSegments } from "./sources";
 import { gradeTranscript, renderGradeForBrief } from "@/lib/skills/grade";
 import {
+  skillHref,
+  skillLinkForStage,
+  skillLinkLabel,
+} from "@/lib/skills/desk-link";
+import {
   DESK_STAGES,
   STAGE_LABELS,
   isDeskStage,
@@ -46,6 +51,20 @@ export type DeskArtifactDTO = {
   createdAt: string;
   updatedAt: string;
   revisions: DeskArtifactRevisionDTO[];
+  /**
+   * The authored skill this stage depends on, when one honestly exists.
+   * Null for clock and echo, which materialise rather than author. The UI must
+   * render the absence rather than reaching for a nearby skill.
+   */
+  skill: StageSkillLinkDTO | null;
+};
+
+export type StageSkillLinkDTO = {
+  slug: string;
+  missing: boolean;
+  reason: string;
+  href: string;
+  label: string;
 };
 
 export type DeskCalendarItemDTO = {
@@ -199,7 +218,25 @@ type JobWithRelations = {
   }[];
 };
 
-export function toDeskJobDTO(job: JobWithRelations): DeskJobDTO {
+/**
+ * Skills the company actually has, by slug.
+ *
+ * Read once per request rather than per artifact: a job has six artifacts and
+ * they share one company. Absence is not an error — a company with no authored
+ * skills is a real state, and it renders as every stage link being `missing`.
+ */
+async function authoredSkillSlugs(): Promise<string[]> {
+  const rows = await prisma.skill.findMany({
+    where: { status: "authored" },
+    select: { slug: true },
+  });
+  return rows.map((r) => r.slug);
+}
+
+export function toDeskJobDTO(
+  job: JobWithRelations,
+  authoredSlugs: readonly string[] = [],
+): DeskJobDTO {
   return {
     id: job.id,
     title: job.title,
@@ -231,6 +268,12 @@ export function toDeskJobDTO(job: JobWithRelations): DeskJobDTO {
         reviewedBy: a.reviewedBy,
         reviewedAt: a.reviewedAt?.toISOString() ?? null,
         reviewNote: a.reviewNote,
+        skill: (() => {
+          const link = skillLinkForStage(a.stage, authoredSlugs);
+          return link
+            ? { ...link, href: skillHref(link), label: skillLinkLabel(link) }
+            : null;
+        })(),
         createdAt: a.createdAt.toISOString(),
         updatedAt: a.updatedAt.toISOString(),
         revisions: (a.revisions ?? [])
@@ -334,7 +377,10 @@ export async function listDeskJobs(
     include: jobInclude,
     orderBy: { updatedAt: "desc" },
   });
-  return rows.map(toDeskJobDTO);
+  // One skill read for the whole list rather than one per job: every job here
+  // shares a company, and the mapping is the same for all of them.
+  const slugs = await authoredSkillSlugs();
+  return rows.map((row) => toDeskJobDTO(row, slugs));
 }
 
 export async function listFiledDeskJobs(
@@ -348,7 +394,7 @@ export async function getDeskJob(id: string): Promise<DeskJobDTO | null> {
     where: { id },
     include: jobInclude,
   });
-  return row ? toDeskJobDTO(row) : null;
+  return row ? toDeskJobDTO(row, await authoredSkillSlugs()) : null;
 }
 
 export async function createDeskJob(input: {
@@ -395,7 +441,7 @@ export async function createDeskJob(input: {
     activity: false,
   });
 
-  return toDeskJobDTO(job);
+  return toDeskJobDTO(job, await authoredSkillSlugs());
 }
 
 /**
@@ -541,7 +587,7 @@ export async function runDeskStage(input: {
     },
   });
 
-  return toDeskJobDTO(updated);
+  return toDeskJobDTO(updated, await authoredSkillSlugs());
 }
 
 export async function updateDeskArtifact(input: {
@@ -603,7 +649,7 @@ export async function updateDeskArtifact(input: {
     payload: { stage: job.stage },
   });
 
-  return toDeskJobDTO(updated);
+  return toDeskJobDTO(updated, await authoredSkillSlugs());
 }
 
 async function materializeClock(jobId: string, channels: string[], dueAt: Date | null) {
@@ -729,6 +775,14 @@ export async function reviewDeskStage(input: {
   jobId: string;
   action: "approve" | "request_changes";
   note?: string;
+  /**
+   * The stage the caller believes it is reviewing. An assertion, not an
+   * instruction: the recovered stage always comes from the job's own rows, and
+   * a mismatch is a 409 rather than a silent re-target. A rejection recorded
+   * against the wrong stage would send the owner to fix the wrong skill, which
+   * is the failure this whole path exists to prevent.
+   */
+  stage?: DeskStage;
   actorEmail: string;
 }): Promise<DeskJobDTO> {
   const job = await prisma.deskJob.findUnique({
@@ -740,6 +794,11 @@ export async function reviewDeskStage(input: {
   if (!isDeskStage(job.stage)) throw new Error("Invalid job stage");
 
   const stage = job.stage;
+  if (input.stage && input.stage !== stage) {
+    throw new Error(
+      `Stage mismatch: the job is at ${stage}, not ${input.stage}`,
+    );
+  }
   const art = job.artifacts.find((a) => a.stage === stage);
   if (!art || (art.reviewState !== "ready" && art.reviewState !== "changes_requested")) {
     throw new Error("Current stage has no ready artifact to review");
@@ -768,7 +827,7 @@ export async function reviewDeskStage(input: {
       actorEmail: input.actorEmail,
       payload: { stage, note: input.note ?? "" },
     });
-    return toDeskJobDTO(updated);
+    return toDeskJobDTO(updated, await authoredSkillSlugs());
   }
 
   // approve
@@ -821,7 +880,7 @@ export async function reviewDeskStage(input: {
       actorEmail: input.actorEmail,
       payload: { stage },
     });
-    return toDeskJobDTO(updated);
+    return toDeskJobDTO(updated, await authoredSkillSlugs());
   }
 
   const updated = await prisma.deskJob.update({
@@ -842,7 +901,7 @@ export async function reviewDeskStage(input: {
     payload: { from: stage, to: nxt },
   });
 
-  return toDeskJobDTO(updated);
+  return toDeskJobDTO(updated, await authoredSkillSlugs());
 }
 
 export async function listCalendarItems(

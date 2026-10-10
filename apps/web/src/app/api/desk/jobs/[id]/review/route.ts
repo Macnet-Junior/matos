@@ -27,6 +27,7 @@ export async function POST(
       jobId: id,
       action: parsed.data.action,
       note: parsed.data.note,
+      stage: parsed.data.stage,
       actorEmail: gate.email,
     });
     return NextResponse.json({ job });

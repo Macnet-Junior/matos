@@ -261,6 +261,18 @@ export const updateDeskArtifactSchema = z.object({
 export const deskReviewSchema = z.object({
   action: z.enum(["approve", "request_changes"]),
   note: z.string().trim().max(2000).optional(),
+  /**
+   * The desk stage the artifact under review was produced by. Required for
+   * `request_changes` because the whole value of a rejection is the loop back
+   * to the authored skill that caused it, and the API route can no longer
+   * recover the stage once the caller has moved on.
+   *
+   * Left optional in the schema so `approve` does not have to send it; the
+   * route enforces it per-action where the requirement actually is.
+   */
+  stage: z
+    .enum(["scout", "ghost", "editor", "press", "clock", "echo"])
+    .optional(),
 });
 
 export const deskInboxActionSchema = z.object({

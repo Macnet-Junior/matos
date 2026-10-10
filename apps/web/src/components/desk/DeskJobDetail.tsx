@@ -84,7 +84,11 @@ export function DeskJobDetail({
       const res = await fetch(`/api/desk/jobs/${job.id}/review`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, note: note || undefined }),
+        body: JSON.stringify({
+          action,
+          note: note || undefined,
+          stage: currentStage ?? undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Review failed");
@@ -346,6 +350,23 @@ export function DeskJobDetail({
                       placeholder="Optional note for approve or changes"
                     />
                   </label>
+                  {artifact?.skill ? (
+                    <p className="mt-2 text-[11px] leading-relaxed text-matos-muted">
+                      Draft is wrong? The fix is usually upstream of the model.{" "}
+                      <Link
+                        href={artifact.skill.href}
+                        className="text-matos-citron underline decoration-dotted underline-offset-2"
+                      >
+                        {artifact.skill.label}
+                      </Link>
+                      . {artifact.skill.reason}
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-[11px] leading-relaxed text-matos-muted">
+                      This stage materialises approved material rather than
+                      authoring it, so there is no skill behind it to fix.
+                    </p>
+                  )}
                 </details>
               ) : null}
 

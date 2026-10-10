@@ -25,13 +25,23 @@ async function readError(res: Response): Promise<string> {
   }
 }
 
-export function MapShell({ initial }: { initial: MapPayload }) {
+export function MapShell({
+  initial,
+  focusSlug,
+}: {
+  initial: MapPayload;
+  /**
+   * A skill to open on arrival, from the desk's "fix this skill" link. Falls
+   * back to the calendar skill, which is the one a new company is most likely
+   * to be working on first.
+   */
+  focusSlug?: string | null;
+}) {
   const [map, setMap] = useState<MapPayload>(initial);
   const [selection, setSelection] = useState<Selection>(() => {
+    const skills = initial.departments.flatMap((d) => d.skills);
     const skill =
-      initial.departments
-        .flatMap((d) => d.skills)
-        .find((s) => s.slug === "content-calendar") ?? null;
+      skills.find((s) => s.slug === (focusSlug ?? "content-calendar")) ?? null;
     return skill ? { kind: "skill", skill } : { kind: "company" };
   });
   const [search, setSearch] = useState("");
