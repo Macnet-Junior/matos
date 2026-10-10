@@ -21,7 +21,7 @@ function channelsLine(channels: ChannelDTO[]): string {
   const connected = channels.filter((channel) => channel.status === "connected");
   const names = channels.map((channel) => channel.name).join(", ");
   if (connected.length === 0) {
-    return `${names} are not connected. Add a key there to publish for real. Until a channel is connected, publish stays simulated.`;
+    return `${names} are not connected. Add a key or a delivery URL there to publish for real. Until a channel is connected, publish stays simulated.`;
   }
   if (connected.length === channels.length) {
     return `${names} are connected. Open that page to check a key or disconnect.`;
@@ -30,7 +30,7 @@ function channelsLine(channels: ChannelDTO[]): string {
     .filter((channel) => channel.status !== "connected")
     .map((channel) => channel.name)
     .join(", ");
-  return `${connected.map((channel) => channel.name).join(", ")} connected. ${waiting} still need a key.`;
+  return `${connected.map((channel) => channel.name).join(", ")} connected. ${waiting} still need a key or a delivery URL.`;
 }
 
 export default async function Page() {

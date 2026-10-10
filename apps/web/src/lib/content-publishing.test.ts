@@ -11,6 +11,7 @@ import {
   SimulatedContentPublisher,
   buildLatePostPayload,
   publishWithFallback,
+  nativeRecordFromPublication,
   publisherProviderFor,
   readNativeDelivery,
   readNativeDeliveryStatus,
@@ -193,10 +194,14 @@ describe("content publishing", () => {
     resetNativeDeliveries();
     // A configured delivery URL is what makes a native publisher live, and a
     // live scheduled post is the case that used to sit at `planned` forever.
-    const calls: { url: string; method: string }[] = [];
+    const calls: { url: string; method: string; body: string | null }[] = [];
     let remote: "published" | "pending" = "pending";
     const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
-      calls.push({ url: String(input), method: init?.method ?? "GET" });
+      calls.push({
+        url: String(input),
+        method: init?.method ?? "GET",
+        body: typeof init?.body === "string" ? init.body : null,
+      });
       return new Response(JSON.stringify({ status: remote }), { status: 200 });
     }) as typeof fetch;
 
@@ -215,6 +220,14 @@ describe("content publishing", () => {
 
     const record = readNativeDelivery(result.externalId)!;
     expect(calls[0]).toMatchObject({ method: "POST" });
+    const posted = JSON.parse(calls[0]!.body ?? "{}") as {
+      idempotencyKey?: string;
+      externalId?: string;
+    };
+    // The POST and the GET use the same idempotency key. externalId is the
+    // prefixed form a receiver may store instead.
+    expect(posted.idempotencyKey).toBe("letter-live");
+    expect(posted.externalId).toBe("newsletter_letter-live");
 
     // Nothing has gone out yet, and the reader says exactly that rather than
     // promoting the post on the strength of the scheduled POST succeeding.
@@ -239,7 +252,60 @@ describe("content publishing", () => {
     // The read is a GET with the id, not a second POST.
     const read = calls.at(-1)!;
     expect(read.method).toBe("GET");
-    expect(read.url).toContain("idempotencyKey=newsletter_letter-live");
+    const readUrl = new URL(read.url);
+    expect(readUrl.searchParams.get("idempotencyKey")).toBe("letter-live");
+    expect(readUrl.searchParams.get("externalId")).toBe("newsletter_letter-live");
+  });
+
+  it("reads a receiver that stored the prefixed external id", async () => {
+    const calls: string[] = [];
+    const fetchImpl = (async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      calls.push(url.searchParams.get("idempotencyKey") ?? "");
+      const key = url.searchParams.get("idempotencyKey");
+      if (key === "newsletter_letter-legacy") {
+        return new Response(JSON.stringify({ status: "published" }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ found: false }), { status: 404 });
+    }) as typeof fetch;
+
+    const status = await readNativeDeliveryStatus(
+      {
+        externalId: "newsletter_letter-legacy",
+        idempotencyKey: "letter-legacy",
+        state: "scheduled",
+        simulated: false,
+        channel: "newsletter",
+        deliveryUrl: "https://sender.test/deliver",
+      },
+      fetchImpl,
+    );
+    expect(status).toBe("published");
+    expect(calls).toEqual(["letter-legacy", "newsletter_letter-legacy"]);
+  });
+
+  it("rebuilds a live read-back from the publication row, not the in-memory map", async () => {
+    resetNativeDeliveries();
+    const record = nativeRecordFromPublication({
+      channel: "newsletter",
+      provider: "native",
+      externalId: "newsletter_desk-calendar:item-1",
+      idempotencyKey: "desk-calendar:item-1",
+      meta: { provider: "native", simulated: false, deliveryStatus: "scheduled" },
+      env: { NEWSLETTER_DELIVERY_URL: "https://sender.test/deliver?token=secret" },
+    });
+    expect(record).not.toBeNull();
+    expect(readNativeDelivery(record!.externalId)).toBeNull();
+    expect(record!.deliveryUrl).toBe("https://sender.test/deliver?token=secret");
+
+    const fetchImpl = (async (input: RequestInfo | URL) => {
+      const key = new URL(String(input)).searchParams.get("idempotencyKey");
+      if (key === "desk-calendar:item-1") {
+        return new Response(JSON.stringify({ status: "published" }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ found: false }), { status: 404 });
+    }) as typeof fetch;
+    expect(await readNativeDeliveryStatus(record!, fetchImpl)).toBe("published");
   });
 
   it("refuses to promote a simulated native delivery by reading it back", async () => {

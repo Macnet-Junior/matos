@@ -15,11 +15,14 @@ export default async function Page() {
           Publish &amp; Channels
         </h1>
         <p className="mt-1.5 max-w-2xl text-xs text-matos-muted">
-          Connect Late.dev, Etsy, or WhatsApp. Keys stay on the server. Without
-          a key, publish stays simulated and is labeled that way. WhatsApp only
-          sends to approved destinations. The card shows how many are
-          configured, with numbers masked, and whether delivery is
-          live-configured or simulated.
+          Connect Late.dev, Etsy, or WhatsApp. Newsletter and blog are
+          live-configured when their delivery URL is set, and simulated
+          otherwise. Keys and URLs stay on the server. This page shows a
+          delivery host only, never the full URL. Without a live channel,
+          publish stays simulated and is labeled that way. WhatsApp only sends
+          to approved destinations. That card shows how many are configured,
+          with numbers masked, and whether delivery is live-configured or
+          simulated.
         </p>
       </div>
       <div className="overflow-auto p-[22px]">

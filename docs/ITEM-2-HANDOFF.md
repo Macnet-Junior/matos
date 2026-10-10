@@ -24,9 +24,25 @@ Use `superlisa_store_secret NAME VALUE` for each of these — it writes to
 
 ### 1. Newsletter or blog — cheapest, no third-party account
 
-The native publisher POSTs `{channel, idempotencyKey, state}` to a URL you
-control and reads state back with `GET <url>?idempotencyKey=<id>` expecting
-`{"status": "published" | "scheduled" | "pending" | "failed"}`.
+The native publisher POSTs this body:
+
+```json
+{
+  "channel": "newsletter",
+  "idempotencyKey": "desk-calendar:<itemId>",
+  "externalId": "newsletter_desk-calendar:<itemId>",
+  "state": "scheduled"
+}
+```
+
+`idempotencyKey` is the canonical id. `externalId` is `<channel>_` plus that
+same id. `state` is `scheduled` or `published` (`draft` is not sent to the URL).
+
+Read-back is `GET <url>?idempotencyKey=<the same idempotencyKey>&externalId=<externalId>`,
+expecting `{"status": "published" | "scheduled" | "pending" | "failed"}`.
+The GET uses the same `idempotencyKey` the POST sent. A receiver that stored
+the prefixed `externalId` instead is still found: the read tries that id
+second, and a `published` or `failed` answer wins over a default `pending`.
 
 Any endpoint that accepts a POST and answers a GET with that shape works — your
 own server, a Cloudflare Worker, a Zapier catch hook, an n8n webhook.
@@ -106,8 +122,8 @@ a real post to a test destination and close the item. Nothing else is required
 2. **No newsletter sender chosen.** The code deliberately does not pick one;
    `NEWSLETTER_DELIVERY_URL` is the contract, and which mail service sits behind
    it is your decision and your account.
-3. **The scheduler is not registered as a recurring job.** `runDueDeliveries`
-   and `reconcileInFlightPublications` exist and are tested, but nothing calls
-   them on a timer yet in this container. Registering that needs a `superlisa-svc`
-   schedule, which is a **Pro-only** feature on this plan. On Free the schedule
-   cannot be created — a delivery will only run when something calls it.
+3. **The scheduler script runs both passes, and the timer is still outside the app.**
+   `pnpm --filter web desk:schedule` calls `runDueDeliveries` and then
+   `reconcileInFlightPublications`. On the ThinkPad, Windows Task Scheduler
+   runs that command every 5 minutes. A container here still has no timer of
+   its own — a delivery runs only when something calls the command.

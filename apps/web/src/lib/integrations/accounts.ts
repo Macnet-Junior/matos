@@ -8,7 +8,7 @@ import { lateApiBase, LateClient } from "./late";
 import { etsyEnv } from "./etsy";
 import { publicWhatsAppAllowlist, whatsappConfigFromEnv } from "./whatsapp";
 import { providerConfigHealth } from "../content-observability";
-import type { ChannelDTO, ChannelProvider, ChannelStatus } from "../types";
+import type { ChannelDTO, ChannelProvider, ChannelStatus, NativeChannelId } from "../types";
 
 export const PROVIDERS: ChannelProvider[] = ["late-dev", "etsy", "whatsapp"];
 
@@ -313,6 +313,112 @@ export async function listChannelStatus(): Promise<ChannelDTO[]> {
   const lateHint = lateKey.key ? maskSecret(lateKey.key) : null;
 
   return [
+    ...integrationChannels({
+      lateStatus,
+      lateHint,
+      lateRow,
+      lateMeta,
+      lateKeySource: lateKey.source,
+      etsyStatus,
+      etsyRow,
+      etsyMeta,
+      etsy,
+      waStatus,
+      waRow,
+      waMeta,
+      wa,
+      waSummary,
+      waMode,
+    }),
+    ...nativeDeliveryChannels(),
+  ];
+}
+
+/** Host only. A malformed value contributes nothing, so a secret blob is not echoed. */
+export function deliveryEndpointHost(raw: string | undefined): string | null {
+  const trimmed = raw?.trim();
+  if (!trimmed) return null;
+  try {
+    return new URL(trimmed).host || null;
+  } catch {
+    return null;
+  }
+}
+
+export function nativeDeliveryChannels(
+  env: NodeJS.ProcessEnv = process.env,
+): ChannelDTO[] {
+  return (["newsletter", "blog"] as const).map((id) => nativeDeliveryChannel(id, env));
+}
+
+function nativeDeliveryChannel(id: NativeChannelId, env: NodeJS.ProcessEnv): ChannelDTO {
+  const envKey = id === "newsletter" ? "NEWSLETTER_DELIVERY_URL" : "BLOG_DELIVERY_URL";
+  const live = Boolean(env[envKey]?.trim());
+  const host = deliveryEndpointHost(env[envKey]);
+  const name = id === "newsletter" ? "Newsletter" : "Blog";
+  return {
+    id,
+    name,
+    status: live ? "connected" : "disconnected",
+    deliveryMode: live ? "live-configured" : "simulated",
+    deliveryHost: host,
+    note: live
+      ? host
+        ? `${name} is live-configured. Delivery host: ${host}. The full URL stays on the server.`
+        : `${name} is live-configured. The delivery URL is set. The full URL stays on the server.`
+      : `${name} is simulated until ${envKey} is set. Nothing is sent.`,
+    phase: "",
+    connectMode: "env",
+    maskedHint: null,
+    lastError: null,
+    externalId: null,
+    meta: {},
+    coverage: {
+      api: live ? "ready" : "disconnected",
+      scheduled: live ? "ready" : "handoff",
+      handoff: "available",
+      disconnected: live ? "n/a" : "yes",
+    },
+    allowedDestination: null,
+  };
+}
+
+function integrationChannels(input: {
+  lateStatus: ChannelStatus;
+  lateHint: string | null;
+  lateRow: { lastError: string | null; externalId: string | null } | undefined;
+  lateMeta: Record<string, unknown>;
+  lateKeySource: "db" | "env" | null;
+  etsyStatus: ChannelStatus;
+  etsyRow: { lastError: string | null; externalId: string | null } | undefined;
+  etsyMeta: Record<string, unknown>;
+  etsy: { apiKey: string | null; redirectUri: string | null };
+  waStatus: ChannelStatus;
+  waRow: { lastError: string | null; externalId: string | null } | undefined;
+  waMeta: Record<string, unknown>;
+  wa: { token: string | null; phoneNumberId: string | null };
+  waSummary: ReturnType<typeof publicWhatsAppAllowlist>;
+  waMode: "live-configured" | "simulated";
+}): ChannelDTO[] {
+  const {
+    lateStatus,
+    lateHint,
+    lateRow,
+    lateMeta,
+    lateKeySource,
+    etsyStatus,
+    etsyRow,
+    etsyMeta,
+    etsy,
+    waStatus,
+    waRow,
+    waMeta,
+    wa,
+    waSummary,
+    waMode,
+  } = input;
+  const waLive = waMode === "live-configured";
+  return [
     {
       id: "late-dev",
       name: "Late.dev",
@@ -329,7 +435,7 @@ export async function listChannelStatus(): Promise<ChannelDTO[]> {
       meta: {
         ...lateMeta,
         apiBase: lateApiBase(),
-        keySource: lateKey.source,
+        keySource: lateKeySource,
       },
       coverage: coverageFor("late-dev", lateStatus),
       allowedDestination: null,
