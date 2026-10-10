@@ -20,42 +20,28 @@ import {
   type SkillDraft,
 } from "./skill";
 
-/** Documented default as of the Gemini video guide (YouTube URL via file_data). */
+/** Documented default. A YouTube URL is sent as camelCase fileData.fileUri. */
 export const DEFAULT_GEMINI_MODEL = "gemini-3.8-flash";
 
 /**
  * How long a background YouTube read may run before it fails and stays retryable.
  *
- * The Gemini video guide samples a full frame every second unless told otherwise.
- * On a normal-length video that read does not finish inside two minutes — a
- * ThinkPad desk hit this module's old 120s abort at 120121ms and saved nothing.
- * Ten minutes is enough for a normal public video at low resolution. A longer
- * one fails with a plain reason instead of hanging the browser.
+ * A direct read of a normal public video on gemini-3.8-flash took about two
+ * minutes. Ten minutes covers that without holding the browser open.
  */
 export const YOUTUBE_READ_TIMEOUT_MS = 10 * 60 * 1000;
 
 /** A pasted transcript is text. It does not need the video budget. */
 export const TRANSCRIPT_READ_TIMEOUT_MS = 90_000;
 
-/**
- * Gemini's own recommendation for general video. Low and medium are the same
- * frame budget on current Gemini 3 models; high spends several times the tokens
- * and is what makes a normal video miss a short timeout.
- */
-export const YOUTUBE_MEDIA_RESOLUTION = "MEDIA_RESOLUTION_LOW";
-
-/**
- * One frame every two seconds. The spoken words still come from the audio.
- * The video guide says to use fps under 1 for lectures and other long clips,
- * and this draft is that kind of watch: steps and what is on screen, not motion.
- */
-export const YOUTUBE_FRAME_FPS = 0.5;
-
 export const YOUTUBE_TIMEOUT_MESSAGE =
   "Gemini took too long to read that video. Nothing was saved. A normal video should finish in a few minutes. If this one is long, paste a transcript instead and try again.";
 
 export const VIDEO_TOO_LONG_MESSAGE =
   "That video is too long for Gemini to read in one pass. Nothing was saved. Try a public video under about an hour, or paste a transcript instead.";
+
+export const VIDEO_BLOCKED_MESSAGE =
+  "Gemini blocked that video and did not return a skill. Nothing was saved. Try a different public video, or paste a transcript.";
 
 export const GEMINI_HOST = "https://generativelanguage.googleapis.com";
 
@@ -266,8 +252,9 @@ function fail(code: DraftSkillFailureCode, reason: string): DraftSkillFailure {
 }
 
 function redact(message: string, key: string): string {
-  if (!key) return message;
-  return message.split(key).join("[redacted]");
+  let out = message;
+  if (key) out = out.split(key).join("[redacted]");
+  return out.replace(/([?&]key=)[^&\s]+/gi, "$1[redacted]");
 }
 
 function geminiOrigin(env: Env): string | DraftSkillFailure {
@@ -321,21 +308,43 @@ function isVideoUnavailable(message: string): boolean {
   );
 }
 
+function errorDetail(body: string, key: string): string {
+  const fromJson = geminiErrorMessage(body);
+  const raw = (fromJson || body).replace(/\s+/g, " ").trim();
+  if (!raw) return "";
+  return redact(raw, key).slice(0, 180);
+}
+
+/**
+ * A tuning option (JSON mode, media resolution, frame rate) was refused, or
+ * Gemini crashed while reading that request. The video itself may still be
+ * readable with the plain body that does not set those options.
+ */
+function shouldRetryPlain(status: number, message: string): boolean {
+  if (status === 401 || status === 403 || status === 404 || status === 429) return false;
+  if (isVideoTooLong(message)) return false;
+  if (status === 400 && isVideoUnavailable(message)) return false;
+  return status === 400 || status >= 500;
+}
+
+function logGeminiHttp(label: string, status: number, detail: string, retrying: boolean): void {
+  const text = detail || "(no error message)";
+  const retry = retrying ? " — retrying the plain YouTube request" : "";
+  console.error(`[youtube-skill] Gemini HTTP ${status} (${label}): ${text}${retry}`);
+}
+
 function failureFromBody(
   status: number,
   body: string,
   mode: DraftSkillInput["mode"],
   key: string,
 ): string {
-  const message = redact(geminiErrorMessage(body), key);
+  const message = redact(geminiErrorMessage(body) || body, key);
+  const detail = errorDetail(body, key);
   if (mode === "youtube" && isVideoTooLong(message)) return VIDEO_TOO_LONG_MESSAGE;
   if (mode === "youtube" && status === 400 && isVideoUnavailable(message)) {
     return "Gemini could not open that video. Use a public YouTube link, not a private or unlisted one. Nothing was saved.";
   }
-  return plainHttpFailure(status, mode);
-}
-
-function plainHttpFailure(status: number, mode: DraftSkillInput["mode"]): string {
   if (status === 401 || status === 403) {
     return "Gemini rejected the API key. Check GEMINI_API_KEY in apps/web/.env.local, then restart Desk and try again.";
   }
@@ -345,8 +354,15 @@ function plainHttpFailure(status: number, mode: DraftSkillInput["mode"]): string
   if (status === 429) {
     return "Gemini is rate-limiting this key. Wait a minute and try again. Nothing was saved.";
   }
+  if (status === 400) {
+    return detail
+      ? `Gemini rejected the request we sent (HTTP 400: ${detail}). Nothing was saved. Try again.`
+      : "Gemini rejected the request we sent. Nothing was saved. Try again.";
+  }
   if (status >= 500) {
-    return "Gemini had a problem on its side. Nothing was saved. Try again.";
+    return detail
+      ? `Gemini had a problem on its side (HTTP ${status}: ${detail}). Nothing was saved. Try again.`
+      : `Gemini had a problem on its side (HTTP ${status}). Nothing was saved. Try again.`;
   }
   if (mode === "transcript") {
     return "Gemini could not turn that transcript into a skill. Nothing was saved. Try again.";
@@ -391,6 +407,27 @@ function formatStamp(ms: number): string {
   const minutes = Math.floor(total / 60);
   const seconds = total % 60;
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+const BLOCKED_FINISH =
+  /^(SAFETY|BLOCKLIST|PROHIBITED_CONTENT|SPII|IMAGE_SAFETY)$/;
+
+function geminiBlockReason(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object") return null;
+  const feedback = (payload as { promptFeedback?: { blockReason?: unknown } }).promptFeedback;
+  if (
+    typeof feedback?.blockReason === "string" &&
+    feedback.blockReason &&
+    feedback.blockReason !== "BLOCK_REASON_UNSPECIFIED"
+  ) {
+    return feedback.blockReason;
+  }
+  const candidates = (payload as { candidates?: unknown }).candidates;
+  const first = Array.isArray(candidates) ? candidates[0] : null;
+  if (!first || typeof first !== "object") return null;
+  const finish = (first as { finishReason?: unknown }).finishReason;
+  if (typeof finish === "string" && BLOCKED_FINISH.test(finish)) return finish;
+  return null;
 }
 
 function candidateText(payload: unknown): string | null {
@@ -554,83 +591,125 @@ export async function draftSkillFromInput(
     input.mode === "youtube" ? { mode: "youtube", url: youtubeUrl } : input,
     localSegments,
   );
-  // Static mode (the default) plus a low frame rate. Agentic mode is for a
-  // different response shape and is slower to start on a normal clip. The text
-  // part stays after the video, which is what the video guide asks for.
-  const parts =
-    input.mode === "youtube"
-      ? [
-          {
-            file_data: { file_uri: youtubeUrl, mime_type: "video/*" },
-            video_metadata: { fps: YOUTUBE_FRAME_FPS },
-          },
-          { text: prompt },
-        ]
-      : [{ text: prompt }];
   const requestUrl = `${origin}/v1beta/models/${model}:generateContent`;
   if (requestUrl.includes(key)) {
     return fail("call_failed", "Gemini could not be called. Nothing was saved. Try again.");
   }
 
+  // The plain body is the one that read this video: camelCase fileData.fileUri,
+  // no mime type, no mediaResolution, no videoMetadata. Low resolution and
+  // fps 0.5 made Gemini fail that same URL in under a second (HTTP 5xx, which
+  // this module used to report only as "a problem on its side"). JSON mode is
+  // attempted first so the skill parse is reliable. If Gemini rejects that
+  // extra option, the next attempt is the plain body.
+  const videoParts = [{ fileData: { fileUri: youtubeUrl } }, { text: prompt }];
+  const attempts: Array<{ label: string; body: Record<string, unknown> }> =
+    input.mode === "youtube"
+      ? [
+          {
+            label: "json",
+            body: {
+              contents: [{ parts: videoParts }],
+              generationConfig: {
+                temperature: 0.2,
+                responseMimeType: "application/json",
+              },
+            },
+          },
+          { label: "plain", body: { contents: [{ parts: videoParts }] } },
+        ]
+      : [
+          {
+            label: "json",
+            body: {
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: {
+                temperature: 0.2,
+                responseMimeType: "application/json",
+              },
+            },
+          },
+        ];
+
   const timeoutMs =
     deps.timeoutMs ??
     (input.mode === "youtube" ? YOUTUBE_READ_TIMEOUT_MS : TRANSCRIPT_READ_TIMEOUT_MS);
   const fetchImpl = deps.fetchImpl ?? fetch;
-  let response: Response;
-  try {
-    response = await fetchImpl(requestUrl, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-goog-api-key": key,
-      },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts }],
-        generation_config: {
-          temperature: 0.2,
-          response_mime_type: "application/json",
-          ...(input.mode === "youtube"
-            ? { media_resolution: YOUTUBE_MEDIA_RESOLUTION }
-            : {}),
+  const watchedInput = input.mode === "youtube" ? { mode: "youtube" as const, url: youtubeUrl } : input;
+
+  for (let index = 0; index < attempts.length; index += 1) {
+    const attempt = attempts[index];
+    if (!attempt) continue;
+    let response: Response;
+    try {
+      response = await fetchImpl(requestUrl, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-goog-api-key": key,
         },
-      }),
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-  } catch (err) {
-    const timedOut = err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError");
-    const reason = timedOut
-      ? input.mode === "youtube"
-        ? YOUTUBE_TIMEOUT_MESSAGE
-        : "Gemini took too long to read that transcript. Nothing was saved. Try again."
-      : "Could not reach Gemini. Check the connection and try again. Nothing was saved.";
-    return fail("call_failed", redact(reason, key));
+        body: JSON.stringify(attempt.body),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (err) {
+      const timedOut = err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError");
+      const detail = redact(err instanceof Error ? err.name : "Error", key);
+      console.error(`[youtube-skill] Gemini request failed (${attempt.label}): ${detail}`);
+      const reason = timedOut
+        ? input.mode === "youtube"
+          ? YOUTUBE_TIMEOUT_MESSAGE
+          : "Gemini took too long to read that transcript. Nothing was saved. Try again."
+        : "Could not reach Gemini. Check the connection and try again. Nothing was saved.";
+      return fail("call_failed", redact(reason, key));
+    }
+
+    if (!response.ok) {
+      const body = (await response.text().catch(() => "")).slice(0, 2_000);
+      const message = redact(geminiErrorMessage(body) || body, key);
+      const retrying = index < attempts.length - 1 && shouldRetryPlain(response.status, message);
+      logGeminiHttp(attempt.label, response.status, errorDetail(body, key), retrying);
+      if (retrying) continue;
+      return fail("call_failed", failureFromBody(response.status, body, input.mode, key));
+    }
+
+    let payload: unknown;
+    try {
+      payload = await response.json();
+    } catch {
+      return fail("bad_parse", BAD_PARSE);
+    }
+    const blocked = geminiBlockReason(payload);
+    const text = candidateText(payload);
+    const canRetryPlain = attempt.label === "json" && index < attempts.length - 1;
+    if (!text) {
+      if (blocked) {
+        console.error(
+          `[youtube-skill] Gemini HTTP 200 (${attempt.label}): blocked (${redact(blocked, key)})`,
+        );
+        return fail("call_failed", VIDEO_BLOCKED_MESSAGE);
+      }
+      if (canRetryPlain) {
+        console.error(
+          "[youtube-skill] Gemini HTTP 200 (json): empty reply — retrying the plain YouTube request",
+        );
+        continue;
+      }
+      return fail("bad_parse", BAD_PARSE);
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(stripFences(text));
+    } catch {
+      if (canRetryPlain) {
+        console.error(
+          "[youtube-skill] Gemini HTTP 200 (json): reply was not JSON — retrying the plain YouTube request",
+        );
+        continue;
+      }
+      return fail("bad_parse", BAD_PARSE);
+    }
+    return skillFromModel(parsed, watchedInput, localSegments, key);
   }
 
-  if (!response.ok) {
-    // The body is read so the connection can close. It is not a skill, it is
-    // not stored, and it is not written to a log — the key must not land there.
-    const body = await response.text().catch(() => "");
-    return fail("call_failed", failureFromBody(response.status, body.slice(0, 2_000), input.mode, key));
-  }
-
-  let payload: unknown;
-  try {
-    payload = await response.json();
-  } catch {
-    return fail("bad_parse", BAD_PARSE);
-  }
-  const text = candidateText(payload);
-  if (!text) return fail("bad_parse", BAD_PARSE);
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(stripFences(text));
-  } catch {
-    return fail("bad_parse", BAD_PARSE);
-  }
-  return skillFromModel(
-    parsed,
-    input.mode === "youtube" ? { mode: "youtube", url: youtubeUrl } : input,
-    localSegments,
-    key,
-  );
+  return fail("call_failed", "Gemini could not read that video. Nothing was saved. Try again.");
 }

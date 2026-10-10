@@ -337,7 +337,7 @@ describe("youtube skill drafts (db)", () => {
         deps: {
           env: { GEMINI_API_KEY: KEY },
           fetchImpl: (async (_url: string, init?: RequestInit) => {
-            sawFile = String(init?.body ?? "").includes("file_data");
+            sawFile = String(init?.body ?? "").includes("fileData");
             return envelope(GOOD_SKILL);
           }) as typeof fetch,
         },
