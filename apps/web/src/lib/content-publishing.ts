@@ -222,9 +222,28 @@ type NativeRecord = {
   state: NativeDeliveryState;
   simulated: boolean;
   channel: ContentPlatform;
+  /**
+   * Where a live delivery was posted, kept so the state of a scheduled item can
+   * be read back later. Null for a simulated delivery, which has no remote
+   * side to ask.
+   */
+  deliveryUrl: string | null;
 };
 
 const nativeDeliveries = new Map<string, NativeRecord>();
+
+/**
+ * The delivery URL a native publisher would POST to. Read from the same env
+ * vars `content-publications.ts` uses so the write path and the read path
+ * cannot disagree about whether a channel is live.
+ */
+export function nativeDeliveryUrl(
+  channel: "newsletter" | "blog",
+  env: NodeJS.ProcessEnv = process.env,
+): string | null {
+  const key = channel === "newsletter" ? "NEWSLETTER_DELIVERY_URL" : "BLOG_DELIVERY_URL";
+  return env[key]?.trim() || null;
+}
 
 export function readNativeDelivery(externalId: string): NativeRecord | null {
   return nativeDeliveries.get(externalId) ?? null;
@@ -288,6 +307,7 @@ class LocalNativePublisher implements ContentPublisher {
       state,
       simulated,
       channel: this.channel,
+      deliveryUrl: simulated ? null : this.deliveryUrl,
     });
     return {
       externalId,
@@ -357,4 +377,33 @@ export async function reconcileAsyncDelivery(input: {
   if (remote === "published") return { status: "published", simulated: false, polled: true };
   if (remote === "failed") return { status: "failed", simulated: false, polled: true };
   return { status: "planned", simulated: false, polled: true };
+}
+
+/**
+ * Read a live native delivery's state back from the delivery URL.
+ *
+ * A native publisher is a single POST, so without this a scheduled newsletter
+ * or blog post would sit at `planned` forever: nothing would ever ask the
+ * remote side whether it went out. The read is a GET to the same URL with the
+ * external id, and the answer is trusted only when it is one of the three
+ * states we act on — anything else is reported as `pending`, because a
+ * provider that answers something unrecognised has not told us the post
+ * failed, and inventing `failed` would be worse than admitting we don't know.
+ */
+export async function readNativeDeliveryStatus(
+  record: NativeRecord,
+  fetchImpl: typeof fetch = fetch,
+): Promise<"pending" | "published" | "failed"> {
+  if (record.simulated || record.deliveryUrl === null) return "pending";
+  const url = new URL(record.deliveryUrl);
+  url.searchParams.set("idempotencyKey", record.externalId);
+  const res = await fetchImpl(url, { method: "GET" });
+  if (!res.ok) {
+    throw new Error(res.status >= 500 ? "provider_unavailable" : "provider_error");
+  }
+  const body = (await res.json()) as { status?: string };
+  if (body.status === "published") return "published";
+  if (body.status === "failed") return "failed";
+  if (body.status === "scheduled" || body.status === "pending") return "pending";
+  return "pending";
 }

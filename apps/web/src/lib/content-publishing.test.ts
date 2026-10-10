@@ -6,16 +6,18 @@ import { WhatsAppContentPublisher } from "./integrations/whatsapp";
 import { resetProviderEvents } from "./content-observability";
 import {
   BlogContentPublisher,
+  EtsyContentPublisher,
   NewsletterContentPublisher,
+  SimulatedContentPublisher,
   buildLatePostPayload,
   publishWithFallback,
   publisherProviderFor,
+  readNativeDelivery,
+  readNativeDeliveryStatus,
   reconcileAsyncDelivery,
   resetNativeDeliveries,
   selectLateAccount,
-  SimulatedContentPublisher,
   withPublishRetry,
-  EtsyContentPublisher,
 } from "./content-publishing";
 
 describe("content publishing", () => {
@@ -185,6 +187,76 @@ describe("content publishing", () => {
     expect(result.simulated).toBe(true);
     expect(result.status).toBe("planned");
     expect(result.externalId.startsWith("sim_listing_")).toBe(true);
+  });
+
+  it("reads a live native delivery back from its delivery URL", async () => {
+    resetNativeDeliveries();
+    // A configured delivery URL is what makes a native publisher live, and a
+    // live scheduled post is the case that used to sit at `planned` forever.
+    const calls: { url: string; method: string }[] = [];
+    let remote: "published" | "pending" = "pending";
+    const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ url: String(input), method: init?.method ?? "GET" });
+      return new Response(JSON.stringify({ status: remote }), { status: 200 });
+    }) as typeof fetch;
+
+    const newsletter = new NewsletterContentPublisher({
+      deliveryUrl: "https://sender.test/deliver",
+      fetchImpl,
+    });
+    const result = await newsletter.schedule({
+      channel: "newsletter",
+      body: "Letter",
+      idempotencyKey: "letter-live",
+      scheduledFor: "2026-02-01T00:00:00.000Z",
+      approved: true,
+    });
+    expect(result.simulated).toBe(false);
+
+    const record = readNativeDelivery(result.externalId)!;
+    expect(calls[0]).toMatchObject({ method: "POST" });
+
+    // Nothing has gone out yet, and the reader says exactly that rather than
+    // promoting the post on the strength of the scheduled POST succeeding.
+    expect(await readNativeDeliveryStatus(record, fetchImpl)).toBe("pending");
+    const pending = await reconcileAsyncDelivery({
+      externalId: record.externalId,
+      simulated: false,
+      knownStatus: "planned",
+      readStatus: () => readNativeDeliveryStatus(record, fetchImpl),
+    });
+    expect(pending).toEqual({ status: "planned", simulated: false, polled: true });
+
+    // Once the sender reports it went out, the read-back promotes it.
+    remote = "published";
+    const done = await reconcileAsyncDelivery({
+      externalId: record.externalId,
+      simulated: false,
+      knownStatus: "planned",
+      readStatus: () => readNativeDeliveryStatus(record, fetchImpl),
+    });
+    expect(done).toEqual({ status: "published", simulated: false, polled: true });
+    // The read is a GET with the id, not a second POST.
+    const read = calls.at(-1)!;
+    expect(read.method).toBe("GET");
+    expect(read.url).toContain("idempotencyKey=newsletter_letter-live");
+  });
+
+  it("refuses to promote a simulated native delivery by reading it back", async () => {
+    resetNativeDeliveries();
+    const blog = new BlogContentPublisher();
+    const result = await blog.schedule({
+      channel: "blog",
+      body: "Post",
+      idempotencyKey: "b-sim",
+      scheduledFor: "2026-02-01T00:00:00.000Z",
+      approved: true,
+    });
+    expect(result.simulated).toBe(true);
+    const record = readNativeDelivery(result.externalId)!;
+    expect(record.deliveryUrl).toBeNull();
+    // No URL, no remote side, no claim: still pending, never published.
+    expect(await readNativeDeliveryStatus(record)).toBe("pending");
   });
 
   it("does not poll providers for simulated deliveries", async () => {

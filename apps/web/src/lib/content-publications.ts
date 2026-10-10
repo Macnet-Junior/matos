@@ -13,6 +13,8 @@ import {
   LateContentPublisher,
   NewsletterContentPublisher,
   publishWithFallback,
+  readNativeDelivery,
+  readNativeDeliveryStatus,
   reconcileAsyncDelivery,
   selectLateAccount,
   SimulatedContentPublisher,
@@ -230,11 +232,21 @@ export async function reconcileDeskPublication(input: {
     publication.status === "published" || publication.status === "failed"
       ? publication.status
       : "planned";
+  // A native newsletter or blog delivery is a single POST, so a scheduled one
+  // would sit at `planned` forever with nothing asking the remote side whether
+  // it went out. Read it back from the recorded delivery URL; anything else
+  // still needs the caller to supply a reader.
+  const nativeRecord = publication.externalId
+    ? readNativeDelivery(publication.externalId)
+    : null;
+  const readStatus =
+    input.readStatus ??
+    (nativeRecord ? () => readNativeDeliveryStatus(nativeRecord) : undefined);
   const result = await reconcileAsyncDelivery({
     externalId: publication.externalId ?? "",
     simulated,
     knownStatus,
-    readStatus: simulated ? undefined : input.readStatus,
+    readStatus: simulated ? undefined : readStatus,
     sleep: async () => undefined,
   });
   const updated = await prisma.deskPublication.update({
