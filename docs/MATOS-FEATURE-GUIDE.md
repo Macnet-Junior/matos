@@ -40,11 +40,11 @@ Then, if you want to fix the company itself: Workspace → Company map → Conte
 1. Read **Pending review gates**. Each row is a workflow or a run that is still on draft or warm. Click it.
 2. Read **Last run**. Click the name to open the practice-run log.
 3. Read **Recent activity**. A row that names something is a link. Click it to open that thing (the seed note opens the company map). The line under the summary is plain words, such as “Workspace seeded”, not a code. A row with nothing behind it is not a link. **View all** opens the full trail.
-4. Read **Channels**. It says whether Late.dev, Etsy, and WhatsApp are connected, and it links to Publish & Channels.
+4. Read **Channels**. It names Late.dev, Etsy, WhatsApp, Newsletter, and Blog, and it links to Publish & Channels.
 
 **What you should see.** Three cards plus a channels line. With seeded data, you should see workflow names, a last run or a prompt to dry-run, and recent lines such as the seed note.
 
-**Limits.** Home does not post anything. On a fresh setup the channels line says Late.dev, Etsy, and WhatsApp are not connected, and that publish stays simulated until one is. It does not say “Phase 4”.
+**Limits.** Home does not post anything. On a fresh setup the channels line says Late.dev, Etsy, WhatsApp, Newsletter, and Blog are not connected, and that publish stays simulated until one is. It does not say “Phase 4”. It never shows a delivery URL.
 
 ## Desk
 
@@ -247,11 +247,13 @@ The page title is **Publish & Channels**.
 
 **How.**
 
-1. Open the page. Read each provider card: Late (social), Etsy, WhatsApp, and the native newsletter/blog path.
+1. Open the page. Read each provider card: Late (social), Etsy, WhatsApp, Newsletter, and Blog.
 2. A connected provider needs keys in the env file, and for Etsy a sign-in handshake. The owner can start those connects. Do not paste secrets into chat.
-3. The sidebar footer **Accent** only shows the citron color `#D6F31F`. It does not change settings.
+3. Newsletter is live when `NEWSLETTER_DELIVERY_URL` is set. Blog is live when `BLOG_DELIVERY_URL` is set. The card says **Live-configured** or **Simulated**. If a URL is set, the card may show the host (for example `127.0.0.1:3099`). It does not show the path, the query, or a password in the URL.
+4. The WhatsApp card lists approved destinations. Numbers are masked. It says live-configured or simulated. There is no way to message anyone else.
+5. The sidebar footer **Accent** only shows the citron color `#D6F31F`. It does not change settings.
 
-**What you should see.** A line that says without keys, publish paths stay simulated. Cards should not claim a live account if none is connected.
+**What you should see.** A line that says without keys, publish paths stay simulated. Newsletter and Blog cards are on the page, next to Late.dev, Etsy, and WhatsApp. Cards should not claim a live account if none is connected. A live newsletter or blog card says Live-configured and, at most, the delivery host. The WhatsApp card shows a count of approved destinations and masked numbers.
 
 **Limits.** With a fresh seed, channels are not connected. Calendar and the scheduler will say simulated until a provider is live. WhatsApp may message only the approved list in `WHATSAPP_ALLOWED_TO` (comma-separated, optional `label|number`, at most 10). `WHATSAPP_GROUP_OR_TO` still works as a single destination and is the default when a post does not name one. The WhatsApp card shows how many destinations are configured, masks each number (for example `+237••••12`), and says `live-configured` or `simulated`. A number that is not on the list is rejected and not sent. There is no option to message anyone.
 
@@ -369,7 +371,7 @@ The page title is **Publish & Channels**.
 
 ## Scheduler
 
-**What it’s for.** When a calendar item is due, and Clock was approved, try to deliver it once.
+**What it’s for.** When a calendar item is due, and Clock was approved, try to deliver it once. Then read newsletter and blog posts back, so a scheduled delivery can finish after the process that posted it has exited.
 
 **Where.** There is no scheduler button. It is a command, run from the project folder:
 
@@ -377,11 +379,21 @@ The page title is **Publish & Channels**.
 pnpm --filter web desk:schedule
 ```
 
-**How.** Approve a job through Clock so a calendar item exists. Connect a channel if you want a live post. Run the command. Read the JSON it prints: considered, delivered, skipped, failed.
+On the owner’s ThinkPad, Windows Task Scheduler runs that command every 5 minutes.
 
-**What you should see.** A one-time result in the terminal. Items that are not due, not approved, or already attempted are skipped. Without live channel keys, a delivery is simulated and stays labeled that way.
+**How.** Approve a job through Clock so a calendar item exists. Connect a channel if you want a live post. For newsletter or blog, set `NEWSLETTER_DELIVERY_URL` or `BLOG_DELIVERY_URL` (the ThinkPad test receiver is `http://127.0.0.1:3099/deliver`). Run the command. Read the JSON it prints: considered, delivered, skipped, failed, and a `reconcile` object (considered, settled, stillOpen).
 
-**Limits.** The Desk app does not run this on a timer by itself. Something outside the app (a schedule on the machine) has to call it. Running it twice should not send the same post twice.
+Each run does two passes, then exits. The first starts deliveries that are due. The second asks the delivery URL how scheduled newsletter and blog posts turned out, and moves the calendar row off `planned` when the answer is published or failed.
+
+The delivery contract, for a receiver you run yourself:
+
+- POST `{ "channel", "idempotencyKey", "externalId", "state" }`. For a Desk item, `idempotencyKey` is `desk-calendar:<itemId>` and `externalId` is `newsletter_desk-calendar:<itemId>` or `blog_desk-calendar:<itemId>`. `state` is `scheduled` or `published`.
+- GET the same URL with `idempotencyKey` set to that same posted key. The reply is `{ "status": "published" | "failed" | "scheduled" | "pending" }`.
+- A receiver that stored the prefixed `externalId` instead of the posted key still matches. The read tries the posted key first, then the prefixed id.
+
+**What you should see.** A one-time result in the terminal. Items that are not due, not approved, or already attempted are skipped. Without live channel keys, a delivery is simulated and stays labeled that way. A live newsletter or blog post stays in flight until the receiver says published or failed. When it does, the calendar row leaves `planned`.
+
+**Limits.** The Desk app does not run this on a timer by itself. Something outside the app (a schedule on the machine) has to call it. Running it twice should not send the same post twice. A run that only re-checks work it already handled does not add a row to Activity or Home. A run that delivers, fails, repairs a calendar row, or settles a read-back does.
 
 ## Who can do what
 

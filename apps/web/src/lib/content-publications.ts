@@ -12,8 +12,8 @@ import {
   isLateSocialPlatform,
   LateContentPublisher,
   NewsletterContentPublisher,
+  nativeRecordFromPublication,
   publishWithFallback,
-  readNativeDelivery,
   readNativeDeliveryStatus,
   reconcileAsyncDelivery,
   selectLateAccount,
@@ -223,11 +223,43 @@ export async function publishDeskCalendarItem(input: {
         payload: { channel: item.channel, reason: "destination_rejected" },
       });
     }
-    return prisma.deskPublication.update({
+    const failed = await prisma.deskPublication.update({
       where: { id: publication.id },
       data: { status: "failed", error: code },
     });
+    // A failed attempt is finished. Leaving the calendar row `planned` would
+    // select it again on every tick and post it again.
+    await alignCalendarWithPublication({
+      idempotencyKey,
+      status: "failed",
+      simulated: false,
+    });
+    return failed;
   }
+}
+
+/**
+ * Move the calendar row onto the publication's terminal status.
+ *
+ * The publication id for a Desk item is `desk-calendar:<itemId>`. Reconcile
+ * used to update only the publication, so the calendar stayed `planned` and
+ * the scheduler selected the same row forever. Returns whether a row changed.
+ */
+export async function alignCalendarWithPublication(input: {
+  idempotencyKey: string;
+  status: "published" | "failed";
+  simulated: boolean;
+}): Promise<boolean> {
+  const prefix = "desk-calendar:";
+  if (!input.idempotencyKey.startsWith(prefix)) return false;
+  const id = input.idempotencyKey.slice(prefix.length);
+  if (!id) return false;
+  const status = input.simulated ? "simulated" : input.status;
+  const updated = await prisma.deskCalendarItem.updateMany({
+    where: { id, NOT: { status } },
+    data: { status, simulated: input.simulated },
+  });
+  return updated.count > 0;
 }
 
 export async function reconcileDeskPublication(input: {
@@ -249,16 +281,21 @@ export async function reconcileDeskPublication(input: {
     publication.status === "published" || publication.status === "failed"
       ? publication.status
       : "planned";
-  // A native newsletter or blog delivery is a single POST, so a scheduled one
-  // would sit at `planned` forever with nothing asking the remote side whether
-  // it went out. Read it back from the recorded delivery URL; anything else
-  // still needs the caller to supply a reader.
-  const nativeRecord = publication.externalId
-    ? readNativeDelivery(publication.externalId)
-    : null;
+  // The record is rebuilt from the row (externalId, idempotencyKey, channel,
+  // simulated meta) and the channel's delivery URL. The in-memory map in the
+  // process that posted is not consulted — that process has usually exited.
+  const nativeRecord = nativeRecordFromPublication({
+    channel: publication.channel,
+    provider: publication.provider,
+    externalId: publication.externalId,
+    idempotencyKey: publication.idempotencyKey,
+    meta,
+  });
   const readStatus =
     input.readStatus ??
-    (nativeRecord ? () => readNativeDeliveryStatus(nativeRecord) : undefined);
+    (nativeRecord && !nativeRecord.simulated
+      ? () => readNativeDeliveryStatus(nativeRecord)
+      : undefined);
   const result = await reconcileAsyncDelivery({
     externalId: publication.externalId ?? "",
     simulated,
@@ -266,10 +303,18 @@ export async function reconcileDeskPublication(input: {
     readStatus: simulated ? undefined : readStatus,
     sleep: async () => undefined,
   });
+  const nextStatus = result.status === "planned" ? publication.status : result.status;
+  const changed = nextStatus !== publication.status;
+  if (!changed) return publication;
   const updated = await prisma.deskPublication.update({
     where: { id: publication.id },
     data: {
-      status: result.status === "planned" ? publication.status : result.status,
+      status: nextStatus,
+      publishedAt:
+        nextStatus === "published" && !result.simulated && !publication.publishedAt
+          ? new Date()
+          : publication.publishedAt,
+      error: nextStatus === "published" ? null : publication.error,
       metaJson: JSON.stringify({
         ...meta,
         simulated: result.simulated,
@@ -278,13 +323,20 @@ export async function reconcileDeskPublication(input: {
       }),
     },
   });
+  if (nextStatus === "published" || nextStatus === "failed") {
+    await alignCalendarWithPublication({
+      idempotencyKey: publication.idempotencyKey,
+      status: nextStatus,
+      simulated: result.simulated,
+    });
+  }
   await appendActivity({
     action: "desk.publication.reconciled",
     entityType: "desk_publication",
     entityId: updated.id,
-    summary: `${publication.channel} delivery ${result.simulated ? "stayed simulated" : "reconciled"}`,
+    summary: `${publication.channel} delivery ${nextStatus}`,
     actorEmail: input.actorEmail,
-    payload: { channel: publication.channel, simulated: result.simulated },
+    payload: { channel: publication.channel, simulated: result.simulated, status: nextStatus },
   });
   return updated;
 }

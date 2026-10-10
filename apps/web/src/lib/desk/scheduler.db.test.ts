@@ -8,10 +8,12 @@ import {
   reviewDeskStage,
   runDeskStage,
 } from "./index";
+import { readNativeDelivery, resetNativeDeliveries } from "@/lib/content-publishing";
 import {
   dueCalendarItems,
   reconcileInFlightPublications,
   runDueDeliveries,
+  runSchedulerTick,
 } from "./scheduler";
 
 /** Walk a job through all six Desk stages, approving every one. */
@@ -258,8 +260,9 @@ describe("desk scheduler (db)", () => {
     // promote it, because there is no remote side to ask.
     expect(before.status).toBe("planned");
 
-    const pass = await reconcileInFlightPublications({ actorEmail: "scheduler:test" });
-    expect(pass.considered).toBeGreaterThanOrEqual(1);
+    await reconcileInFlightPublications({ actorEmail: "scheduler:test" });
+    // A simulated row has no remote side, so the reconcile batch leaves it out
+    // rather than polling it forever. It must stay planned either way.
 
     const after = await prisma.deskPublication.findUniqueOrThrow({
       where: { id: before.id },
@@ -327,4 +330,195 @@ describe("desk scheduler (db)", () => {
     expect(item?.fallback).toBe(true);
     expect(item?.status).toBe("fallback_brief");
   });
+
+  it("runs delivery and reconcile on the same tick", async () => {
+    const job = await fileJob({ title: "Both passes", channels: ["newsletter"] });
+    const row = await prisma.deskCalendarItem.findFirstOrThrow({
+      where: { jobId: job.id, channel: "newsletter" },
+    });
+    const records = new Map<string, string>();
+    await withNewsletterReceiver(records, async () => {
+      const tick = await runSchedulerTick({
+        actorEmail: "scheduler:test",
+        now: new Date(),
+        limit: 100,
+      });
+      expect(tick.deliveries.results.some((result) => result.calendarItemId === row.id)).toBe(
+        true,
+      );
+      expect(tick.deliveries.attempted).toBeGreaterThanOrEqual(1);
+      expect(tick.reconcile.settled).toBeGreaterThanOrEqual(1);
+    }, { settle: "published" });
+
+    const publication = await prisma.deskPublication.findUniqueOrThrow({
+      where: { idempotencyKey: `desk-calendar:${row.id}` },
+    });
+    expect(publication.status).toBe("published");
+    const calendar = await prisma.deskCalendarItem.findUniqueOrThrow({ where: { id: row.id } });
+    expect(calendar.status).toBe("published");
+    expect(records.get(`desk-calendar:${row.id}`)).toBe("published");
+  });
+
+  it("reconciles a delivery posted by another process and then stays quiet", async () => {
+    const job = await fileJob({ title: "Other process", channels: ["newsletter"] });
+    const row = await prisma.deskCalendarItem.findFirstOrThrow({
+      where: { jobId: job.id, channel: "newsletter" },
+    });
+    const records = new Map<string, string>();
+    const gets: string[] = [];
+    await withNewsletterReceiver(records, async (calls) => {
+      await runDueDeliveries({ actorEmail: "scheduler:test", now: new Date(), limit: 100 });
+      const posted = await prisma.deskPublication.findUniqueOrThrow({
+        where: { idempotencyKey: `desk-calendar:${row.id}` },
+      });
+      expect(posted.status).toBe("planned");
+      expect(posted.externalId).toBe(`newsletter_desk-calendar:${row.id}`);
+      expect(readNativeDelivery(posted.externalId!)).not.toBeNull();
+      // The posting process is gone. The map must not be how the next pass reads.
+      resetNativeDeliveries();
+      expect(readNativeDelivery(posted.externalId!)).toBeNull();
+
+      const calendar = await prisma.deskCalendarItem.findUniqueOrThrow({ where: { id: row.id } });
+      expect(calendar.status).toBe("planned");
+
+      const ranBefore = await prisma.activityEvent.count({
+        where: { action: "desk.schedule.ran" },
+      });
+      const reconciledBefore = await prisma.activityEvent.count({
+        where: { action: "desk.publication.reconciled" },
+      });
+
+      await reconcileInFlightPublications({ actorEmail: "scheduler:test", limit: 100 });
+      const stillOpen = await prisma.deskPublication.findUniqueOrThrow({
+        where: { id: posted.id },
+      });
+      expect(stillOpen.status).toBe("planned");
+      expect(
+        await prisma.activityEvent.count({ where: { action: "desk.publication.reconciled" } }),
+      ).toBe(reconciledBefore);
+
+      await runSchedulerTick({ actorEmail: "scheduler:test", now: new Date(), limit: 100 });
+      expect(await prisma.activityEvent.count({ where: { action: "desk.schedule.ran" } })).toBe(
+        ranBefore,
+      );
+
+      records.set(`desk-calendar:${row.id}`, "published");
+      const settled = await reconcileInFlightPublications({
+        actorEmail: "scheduler:test",
+        limit: 100,
+      });
+      expect(settled.settled).toBeGreaterThanOrEqual(1);
+      const done = await prisma.deskPublication.findUniqueOrThrow({ where: { id: posted.id } });
+      expect(done.status).toBe("published");
+      const moved = await prisma.deskCalendarItem.findUniqueOrThrow({ where: { id: row.id } });
+      expect(moved.status).toBe("published");
+      expect(
+        await prisma.activityEvent.count({ where: { action: "desk.publication.reconciled" } }),
+      ).toBe(reconciledBefore + 1);
+
+      const quiet = await prisma.activityEvent.count({ where: { action: "desk.schedule.ran" } });
+      await runSchedulerTick({ actorEmail: "scheduler:test", now: new Date(), limit: 100 });
+      expect(await prisma.activityEvent.count({ where: { action: "desk.schedule.ran" } })).toBe(
+        quiet,
+      );
+      expect(
+        await prisma.activityEvent.count({ where: { action: "desk.publication.reconciled" } }),
+      ).toBe(reconciledBefore + 1);
+      for (const call of calls) {
+        if (call.method === "GET" && call.key) gets.push(call.key);
+      }
+    });
+
+    // Read-back asked with the same key the POST stored, not only the prefixed id.
+    expect(gets).toContain(`desk-calendar:${row.id}`);
+    expect(records.has(`newsletter_desk-calendar:${row.id}`)).toBe(false);
+  });
+
+  it("pulls a planned calendar row forward when the publication is already published", async () => {
+    const job = await fileJob({ title: "Stuck calendar", channels: ["newsletter"] });
+    const row = await prisma.deskCalendarItem.findFirstOrThrow({
+      where: { jobId: job.id, channel: "newsletter" },
+    });
+    await prisma.deskCalendarItem.update({
+      where: { id: row.id },
+      data: { status: "planned", simulated: false },
+    });
+    await prisma.deskPublication.create({
+      data: {
+        jobId: job.id,
+        channel: "newsletter",
+        provider: "native",
+        idempotencyKey: `desk-calendar:${row.id}`,
+        status: "published",
+        externalId: `newsletter_desk-calendar:${row.id}`,
+        attemptCount: 1,
+        lastAttemptAt: new Date(),
+        metaJson: JSON.stringify({ provider: "native", simulated: false, deliveryStatus: "published" }),
+      },
+    });
+
+    const before = await prisma.activityEvent.count({ where: { action: "desk.schedule.ran" } });
+    const first = await runDueDeliveries({
+      actorEmail: "scheduler:test",
+      now: new Date(),
+      limit: 100,
+    });
+    expect(first.results.find((result) => result.calendarItemId === row.id)?.reason).toBe(
+      "calendar_synced_published",
+    );
+    expect(
+      (await prisma.deskCalendarItem.findUniqueOrThrow({ where: { id: row.id } })).status,
+    ).toBe("published");
+    expect(await prisma.activityEvent.count({ where: { action: "desk.schedule.ran" } })).toBe(
+      before + 1,
+    );
+
+    const mid = await prisma.activityEvent.count({ where: { action: "desk.schedule.ran" } });
+    await runDueDeliveries({ actorEmail: "scheduler:test", now: new Date(), limit: 100 });
+    expect(await prisma.activityEvent.count({ where: { action: "desk.schedule.ran" } })).toBe(mid);
+  });
 });
+
+type ReceiverCall = { method: string; key: string | null; body: string | null };
+
+/**
+ * POST stores only `idempotencyKey` (what a receiver that follows the body
+ * does). GET looks that key up. `settle` is the status GET returns after the
+ * POST; the default keeps the posted state, which for a due Desk item is
+ * `scheduled` and therefore still open.
+ */
+async function withNewsletterReceiver(
+  records: Map<string, string>,
+  fn: (calls: ReceiverCall[]) => Promise<void>,
+  options?: { settle?: string },
+) {
+  const previousFetch = globalThis.fetch;
+  const previousUrl = process.env.NEWSLETTER_DELIVERY_URL;
+  const calls: ReceiverCall[] = [];
+  process.env.NEWSLETTER_DELIVERY_URL = "http://127.0.0.1:3099/deliver";
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const method = init?.method ?? "GET";
+    const body = typeof init?.body === "string" ? init.body : null;
+    if (method === "POST") {
+      const parsed = JSON.parse(body ?? "{}") as { idempotencyKey?: string; state?: string };
+      if (parsed.idempotencyKey) {
+        records.set(parsed.idempotencyKey, options?.settle ?? parsed.state ?? "scheduled");
+      }
+      calls.push({ method, key: parsed.idempotencyKey ?? null, body });
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }
+    const key = new URL(String(input)).searchParams.get("idempotencyKey");
+    calls.push({ method, key, body: null });
+    const status = key ? records.get(key) : undefined;
+    if (!status) return new Response(JSON.stringify({ found: false }), { status: 404 });
+    return new Response(JSON.stringify({ status }), { status: 200 });
+  }) as typeof fetch;
+  try {
+    await fn(calls);
+  } finally {
+    globalThis.fetch = previousFetch;
+    if (previousUrl === undefined) delete process.env.NEWSLETTER_DELIVERY_URL;
+    else process.env.NEWSLETTER_DELIVERY_URL = previousUrl;
+    resetNativeDeliveries();
+  }
+}

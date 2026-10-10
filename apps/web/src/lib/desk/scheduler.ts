@@ -1,6 +1,7 @@
-import { prisma } from "@matos/db";
+import { parseJsonObject, prisma } from "@matos/db";
 import { appendActivity } from "@/lib/map-data";
 import {
+  alignCalendarWithPublication,
   publishDeskCalendarItem,
   reconcileDeskPublication,
 } from "@/lib/content-publications";
@@ -97,6 +98,10 @@ export type SchedulerOutcome = {
   delivered: number;
   skipped: number;
   failed: number;
+  /** Publisher attempts started on this tick. A short-circuit re-read is not one. */
+  attempted: number;
+  /** Calendar rows pulled forward to a publication that had already finished. */
+  repaired: number;
   results: Array<{
     calendarItemId: string;
     channel: string;
@@ -125,6 +130,8 @@ export async function runDueDeliveries(input: {
     delivered: 0,
     skipped: 0,
     failed: 0,
+    attempted: 0,
+    repaired: 0,
     results: [],
   };
 
@@ -187,23 +194,62 @@ export async function runDueDeliveries(input: {
       continue;
     }
 
+    const idempotencyKey = `desk-calendar:${item.id}`;
+    const existing = await prisma.deskPublication.findUnique({
+      where: { idempotencyKey },
+    });
+    // A publication that already finished must take the calendar with it.
+    // Reconcile used to leave the calendar at `planned`, and every later tick
+    // selected the row again. Healing it here covers rows finished by an
+    // earlier process. It is not a new delivery.
+    if (existing && (existing.status === "published" || existing.status === "failed")) {
+      const meta = parseJsonObject(existing.metaJson);
+      const simulated =
+        existing.status !== "failed" &&
+        (Boolean(existing.externalId?.startsWith("sim_")) ||
+          meta.simulated === true ||
+          meta.provider === "simulated" ||
+          meta.fallback === true);
+      const repaired = await alignCalendarWithPublication({
+        idempotencyKey,
+        status: existing.status,
+        simulated,
+      });
+      if (repaired) outcome.repaired += 1;
+      outcome.skipped += 1;
+      outcome.results.push({
+        calendarItemId: item.id,
+        channel: item.channel,
+        outcome: "skipped",
+        reason: repaired ? `calendar_synced_${existing.status}` : `already_${existing.status}`,
+      });
+      continue;
+    }
+
     try {
       const publication = await publishDeskCalendarItem({
         calendarItemId: item.id,
         actorEmail: input.actorEmail,
       });
+      const fresh = !existing || publication.attemptCount !== existing.attemptCount;
+      if (fresh) outcome.attempted += 1;
       // `planned` is an in-flight publication, not a delivered one. Counting it
       // as delivered would let the scheduler report a post that has not gone
-      // out — the exact overclaim the Desk's gate exists to prevent. Only
-      // `published` counts, and everything else carries its real status back.
-      const delivered = publication.status === "published";
+      // out — the exact overclaim the Desk's gate exists to prevent. Only a
+      // new `published` counts. Reading an existing row again is a skip, not
+      // another delivery.
+      const delivered = fresh && publication.status === "published";
       if (delivered) outcome.delivered += 1;
       else outcome.skipped += 1;
       outcome.results.push({
         calendarItemId: item.id,
         channel: item.channel,
         outcome: delivered ? "delivered" : "skipped",
-        reason: delivered ? "published" : `publication_${publication.status}`,
+        reason: delivered
+          ? "published"
+          : fresh
+            ? `publication_${publication.status}`
+            : `already_${publication.status}`,
       });
     } catch (err) {
       // A scheduled delivery that fails must be loud. Swallowing it here would
@@ -227,7 +273,14 @@ export async function runDueDeliveries(input: {
     }
   }
 
-  if (outcome.considered > 0) {
+  // A tick that only re-reads rows it already handled must not write Activity.
+  // Those rows used to log "0 delivered, N skipped" every few minutes.
+  const changed =
+    outcome.delivered > 0 ||
+    outcome.failed > 0 ||
+    outcome.attempted > 0 ||
+    outcome.repaired > 0;
+  if (changed) {
     await appendActivity({
       action: "desk.schedule.ran",
       entityType: "desk_schedule",
@@ -239,6 +292,34 @@ export async function runDueDeliveries(input: {
   }
 
   return outcome;
+}
+
+export type SchedulerTick = {
+  deliveries: SchedulerOutcome;
+  reconcile: { considered: number; settled: number; stillOpen: number };
+};
+
+/**
+ * One scheduler run: start anything that is due, then read back anything
+ * already in flight. The cron entry calls this once and exits. The two passes
+ * stay separate functions so a reconcile can never post and a delivery pass
+ * can never pretend to finish a scheduled post.
+ */
+export async function runSchedulerTick(input: {
+  actorEmail: string;
+  now?: Date;
+  limit?: number;
+}): Promise<SchedulerTick> {
+  const deliveries = await runDueDeliveries({
+    actorEmail: input.actorEmail,
+    now: input.now,
+    limit: input.limit,
+  });
+  const reconcile = await reconcileInFlightPublications({
+    actorEmail: input.actorEmail,
+    limit: input.limit,
+  });
+  return { deliveries, reconcile };
 }
 
 /**
@@ -258,7 +339,17 @@ export async function reconcileInFlightPublications(input: {
   limit?: number;
 }): Promise<{ considered: number; settled: number; stillOpen: number }> {
   const rows = await prisma.deskPublication.findMany({
-    where: { status: { in: [...IN_FLIGHT_STATUSES] } },
+    where: {
+      status: { in: [...IN_FLIGHT_STATUSES] },
+      // Simulated rows have no remote side. Leaving them in this query let
+      // them occupy the batch forever and crowd out a live delivery.
+      NOT: {
+        OR: [
+          { externalId: { startsWith: "sim_" } },
+          { metaJson: { contains: '"simulated":true' } },
+        ],
+      },
+    },
     orderBy: { lastAttemptAt: "asc" },
     take: input.limit ?? 25,
     select: { id: true },

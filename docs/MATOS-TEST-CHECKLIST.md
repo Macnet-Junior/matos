@@ -20,7 +20,7 @@ HOME-1 Open Home and you should see Pending review gates, Last run, and Recent a
 
 HOME-2 On Home, Last run should show a workflow name or the line that says no runs yet and points at Workflows.
 
-HOME-3 On Home, the Channels line should say Late.dev, Etsy, and WhatsApp are not connected, with a link to Publish & Channels. It should not say Phase 4.
+HOME-3 On Home, the Channels line should name Late.dev, Etsy, WhatsApp, Newsletter, and Blog. On a fresh setup it should say they are not connected, with a link to Publish & Channels, and that publish stays simulated. It should not say Phase 4. It should not show a delivery URL.
 
 HOME-4 On Home, click the recent activity row for the seed note. It should open the company map. The line under the summary should be plain words such as Workspace seeded, not a code like seed.
 
@@ -74,7 +74,7 @@ REPO-1 Repository should not be in the sidebar. Open http://localhost:3040/repos
 
 ACT-1 Open Records → Activity. You should see a list of events, newest first, or a clear empty state. A row that names something should be a link. The action should be plain words, not a dotted code.
 
-CHAN-1 Open Records → Channels (page title Publish & Channels). It should say that without keys, publish stays simulated. It should not show a live connected account on a fresh setup. The WhatsApp card should say how many approved destinations are configured, mask numbers (never the full number), and say simulated rather than live-configured when WhatsApp is not keyed.
+CHAN-1 Open Records → Channels (page title Publish & Channels). It should say that without keys, publish stays simulated. It should list Newsletter and Blog as well as Late.dev, Etsy, and WhatsApp. Newsletter and Blog should read Simulated, or Live-configured when a delivery URL is set. A live card may show the host only (for example 127.0.0.1:3099). It should not show the path, query, or a password. The WhatsApp card should say how many approved destinations are configured, mask numbers (never the full number), and say simulated rather than live-configured when WhatsApp is not keyed. It should not show a live connected account on a fresh setup.
 
 OPS-1 Open Ops. You should see an online count and links to Feed, Presence, Usage, Billing, Content, and Auto-response.
 
@@ -106,7 +106,9 @@ SW-1 Skillwright is separate. From the project folder run pnpm dev:skillwright a
 
 ENG-1 Look through the sidebar. There should be no Content Engine item. Ops → Content is only the scoreboard.
 
-SCHED-1 There should be no scheduler button in the app. From the project folder, pnpm --filter web desk:schedule should print a JSON result and exit. Skip if you are not in a terminal.
+SCHED-1 There should be no scheduler button in the app. From the project folder, pnpm --filter web desk:schedule should print a JSON result with a reconcile block and exit. Skip if you are not in a terminal.
+
+SCHED-2 Run that command again when nothing new is due. Activity and Home should not gain another “Scheduler: 0 delivered…” row. If the test receiver at http://127.0.0.1:3099/deliver has marked a newsletter or blog post published, that calendar row should no longer say planned. Skip the receiver half if the URL is not set.
 
 ## Notes
 
@@ -164,4 +166,5 @@ YT-1
 SW-1 
 ENG-1 
 SCHED-1 
+SCHED-2 
 ```

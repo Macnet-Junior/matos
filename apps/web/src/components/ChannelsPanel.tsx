@@ -2,17 +2,19 @@
 
 import { useMemo, useState } from "react";
 import { Badge, Button } from "@matos/ui";
-import type { ChannelDTO, ChannelStatus } from "@/lib/types";
+import type { ChannelDTO } from "@/lib/types";
 
-function statusTone(status: ChannelStatus): "citron" | "muted" | "danger" {
-  if (status === "connected") return "citron";
-  if (status === "error") return "danger";
+function statusTone(channel: ChannelDTO): "citron" | "muted" | "danger" {
+  if (channel.deliveryMode === "live-configured" || channel.status === "connected") return "citron";
+  if (channel.status === "error") return "danger";
   return "muted";
 }
 
-function statusLabel(status: ChannelStatus): string {
-  if (status === "connected") return "Connected";
-  if (status === "error") return "Error";
+function statusLabel(channel: ChannelDTO): string {
+  if (channel.deliveryMode === "live-configured") return "Live-configured";
+  if (channel.deliveryMode === "simulated") return "Simulated";
+  if (channel.status === "connected") return "Connected";
+  if (channel.status === "error") return "Error";
   return "Disconnected";
 }
 
@@ -218,8 +220,8 @@ export function ChannelsPanel({
                   </p>
                 ) : null}
               </div>
-              <Badge tone={statusTone(ch.status)}>
-                {statusLabel(ch.status)}
+              <Badge tone={statusTone(ch)}>
+                {statusLabel(ch)}
               </Badge>
             </div>
 
@@ -280,6 +282,14 @@ export function ChannelsPanel({
                   </span>
                 ) : null}
               </div>
+            ) : null}
+
+            {ch.id === "newsletter" || ch.id === "blog" ? (
+              <p className="mt-3 text-[11px] text-matos-muted">
+                {ch.deliveryMode === "live-configured"
+                  ? `Live-configured${ch.deliveryHost ? ` · host ${ch.deliveryHost}` : ""}. The URL stays on the server.`
+                  : "Simulated. Set the delivery URL in the environment to send for real."}
+              </p>
             ) : null}
 
             {ch.id === "whatsapp" ? (

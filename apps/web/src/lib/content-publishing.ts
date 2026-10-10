@@ -219,19 +219,32 @@ export class LateContentPublisher implements ContentPublisher {
   }
 }
 
-type NativeRecord = {
+export type NativeRecord = {
   externalId: string;
+  /**
+   * The key sent on POST. Read-back tries this before `externalId`, because a
+   * receiver stores whichever identifier it was given and those two have not
+   * always been the same string.
+   */
+  idempotencyKey: string;
   state: NativeDeliveryState;
   simulated: boolean;
-  channel: ContentPlatform;
+  channel: "newsletter" | "blog";
   /**
    * Where a live delivery was posted, kept so the state of a scheduled item can
    * be read back later. Null for a simulated delivery, which has no remote
-   * side to ask.
+   * side to ask. Reconcile rebuilds this from the channel's env URL plus the
+   * publication row — the in-memory map does not survive the next process.
    */
   deliveryUrl: string | null;
 };
 
+/**
+ * Same-process cache of native posts. `deliveryStatus` on the publisher that
+ * just posted may use it. Reconcile must not: a scheduler tick is a new
+ * process, and the map is empty there. Read-back uses
+ * `nativeRecordFromPublication` instead.
+ */
 const nativeDeliveries = new Map<string, NativeRecord>();
 
 /**
@@ -239,12 +252,21 @@ const nativeDeliveries = new Map<string, NativeRecord>();
  * vars `content-publications.ts` uses so the write path and the read path
  * cannot disagree about whether a channel is live.
  */
+export type NativeDeliveryEnv = {
+  NEWSLETTER_DELIVERY_URL?: string;
+  BLOG_DELIVERY_URL?: string;
+};
+
 export function nativeDeliveryUrl(
   channel: "newsletter" | "blog",
-  env: NodeJS.ProcessEnv = process.env,
+  env?: NativeDeliveryEnv,
 ): string | null {
+  const source = env ?? {
+    NEWSLETTER_DELIVERY_URL: process.env.NEWSLETTER_DELIVERY_URL,
+    BLOG_DELIVERY_URL: process.env.BLOG_DELIVERY_URL,
+  };
   const key = channel === "newsletter" ? "NEWSLETTER_DELIVERY_URL" : "BLOG_DELIVERY_URL";
-  return env[key]?.trim() || null;
+  return source[key]?.trim() || null;
 }
 
 export function readNativeDelivery(externalId: string): NativeRecord | null {
@@ -253,6 +275,59 @@ export function readNativeDelivery(externalId: string): NativeRecord | null {
 
 export function resetNativeDeliveries(): void {
   nativeDeliveries.clear();
+}
+
+/**
+ * Keys a receiver may have stored for one delivery, canonical first.
+ *
+ * POST sends `idempotencyKey` (for a Desk item, `desk-calendar:<itemId>`) and
+ * `externalId` (`<channel>_<idempotencyKey>`). GET asks with the same
+ * `idempotencyKey` the POST used. The prefixed id is only a second lookup, for
+ * a receiver that stored that form instead.
+ */
+export function nativeLookupKeys(record: Pick<NativeRecord, "idempotencyKey" | "externalId">): string[] {
+  const keys: string[] = [];
+  for (const key of [record.idempotencyKey, record.externalId]) {
+    const trimmed = key.trim();
+    if (trimmed && !keys.includes(trimmed)) keys.push(trimmed);
+  }
+  return keys;
+}
+
+/**
+ * Rebuild a native delivery from the publication row and the channel's env URL.
+ * Returns null when the row is not a newsletter or blog delivery. Simulated
+ * rows come back with a null URL so nothing is polled.
+ */
+export function nativeRecordFromPublication(input: {
+  channel: string;
+  provider: string;
+  externalId: string | null;
+  idempotencyKey: string;
+  meta: Record<string, unknown>;
+  env?: NativeDeliveryEnv;
+}): NativeRecord | null {
+  if (input.channel !== "newsletter" && input.channel !== "blog") return null;
+  if (input.provider !== "native" && input.meta.provider !== "native") return null;
+  if (!input.externalId) return null;
+  const simulated =
+    input.externalId.startsWith("sim_") ||
+    input.meta.simulated === true ||
+    input.meta.provider === "simulated" ||
+    input.meta.fallback === true;
+  const rawState = input.meta.deliveryStatus;
+  const state: NativeDeliveryState =
+    rawState === "draft" || rawState === "scheduled" || rawState === "published" || rawState === "failed"
+      ? rawState
+      : "scheduled";
+  return {
+    externalId: input.externalId,
+    idempotencyKey: input.idempotencyKey,
+    state,
+    simulated,
+    channel: input.channel,
+    deliveryUrl: simulated ? null : nativeDeliveryUrl(input.channel, input.env),
+  };
 }
 
 class LocalNativePublisher implements ContentPublisher {
@@ -295,6 +370,7 @@ class LocalNativePublisher implements ContentPublisher {
           body: JSON.stringify({
             channel: this.channel,
             idempotencyKey: input.idempotencyKey,
+            externalId,
             state,
           }),
         });
@@ -306,6 +382,7 @@ class LocalNativePublisher implements ContentPublisher {
     }
     nativeDeliveries.set(externalId, {
       externalId,
+      idempotencyKey: input.idempotencyKey,
       state,
       simulated,
       channel: this.channel,
@@ -381,31 +458,64 @@ export async function reconcileAsyncDelivery(input: {
   return { status: "planned", simulated: false, polled: true };
 }
 
+type NativeReadHit = "published" | "failed" | "pending" | "miss";
+
 /**
  * Read a live native delivery's state back from the delivery URL.
  *
- * A native publisher is a single POST, so without this a scheduled newsletter
- * or blog post would sit at `planned` forever: nothing would ever ask the
- * remote side whether it went out. The read is a GET to the same URL with the
- * external id, and the answer is trusted only when it is one of the three
- * states we act on — anything else is reported as `pending`, because a
- * provider that answers something unrecognised has not told us the post
- * failed, and inventing `failed` would be worse than admitting we don't know.
+ * Contract: POST `{ channel, idempotencyKey, externalId, state }` and
+ * GET `?idempotencyKey=<the same idempotencyKey>&externalId=<externalId>`,
+ * expecting `{ "status": "published" | "failed" | "scheduled" | "pending" }`.
+ * `idempotencyKey` is the canonical id (Desk uses `desk-calendar:<itemId>`).
+ * `externalId` is `<channel>_<idempotencyKey>`. A receiver may store either.
+ * The read tries the canonical key first and the prefixed id second, and a
+ * terminal answer wins over an open one, so a default "pending" for an
+ * unknown key cannot hide a real `published` stored under the other key.
+ * Anything unrecognised is `pending`: inventing `failed` is worse than
+ * admitting we don't know. A simulated record is not polled.
  */
 export async function readNativeDeliveryStatus(
   record: NativeRecord,
   fetchImpl: typeof fetch = fetch,
 ): Promise<"pending" | "published" | "failed"> {
   if (record.simulated || record.deliveryUrl === null) return "pending";
-  const url = new URL(record.deliveryUrl);
-  url.searchParams.set("idempotencyKey", record.externalId);
+  const keys = nativeLookupKeys(record);
+  let best: "failed" | "pending" | null = null;
+  let lastError: Error | null = null;
+  for (const key of keys) {
+    try {
+      const hit = await readNativeDeliveryKey(record, key, fetchImpl);
+      if (hit === "published") return "published";
+      if (hit === "failed") best = "failed";
+      else if (hit === "pending" && best !== "failed") best = "pending";
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error("provider_error");
+    }
+  }
+  if (best) return best;
+  if (lastError) throw lastError;
+  return "pending";
+}
+
+async function readNativeDeliveryKey(
+  record: NativeRecord,
+  key: string,
+  fetchImpl: typeof fetch,
+): Promise<NativeReadHit> {
+  const url = new URL(record.deliveryUrl!);
+  url.searchParams.set("idempotencyKey", key);
+  url.searchParams.set("externalId", record.externalId);
   const res = await fetchImpl(url, { method: "GET" });
+  if (res.status === 404) return "miss";
   if (!res.ok) {
     throw new Error(res.status >= 500 ? "provider_unavailable" : "provider_error");
   }
-  const body = (await res.json()) as { status?: string };
+  const body = (await res.json()) as { status?: string; found?: boolean };
+  if (body.found === false) return "miss";
   if (body.status === "published") return "published";
   if (body.status === "failed") return "failed";
-  if (body.status === "scheduled" || body.status === "pending") return "pending";
-  return "pending";
+  if (body.status === "scheduled" || body.status === "pending" || body.status === "draft") {
+    return "pending";
+  }
+  return "miss";
 }

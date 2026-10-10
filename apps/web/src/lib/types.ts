@@ -211,7 +211,10 @@ export interface HomeDigestDTO {
 }
 
 export type ChannelProvider = "late-dev" | "etsy" | "whatsapp";
+export type NativeChannelId = "newsletter" | "blog";
+export type ChannelId = ChannelProvider | NativeChannelId;
 export type ChannelStatus = "connected" | "disconnected" | "error";
+export type NativeDeliveryMode = "live-configured" | "simulated";
 
 export type CoverageCell = "ready" | "handoff" | "gated" | "disconnected" | "available" | "n/a" | "yes";
 
@@ -232,7 +235,7 @@ export interface ChannelStubDTO {
 }
 
 export interface ChannelDTO {
-  id: ChannelProvider;
+  id: ChannelId;
   name: string;
   status: ChannelStatus;
   note: string;
@@ -252,4 +255,11 @@ export interface ChannelDTO {
     rejectedCount: number;
     destinations: { label: string | null; masked: string }[];
   } | null;
+  /**
+   * Newsletter and blog only. `live-configured` means the delivery URL is set.
+   * The URL itself is never copied onto this object.
+   */
+  deliveryMode?: NativeDeliveryMode;
+  /** Host of the delivery URL, when it parses. Never the path, query, or userinfo. */
+  deliveryHost?: string | null;
 }
