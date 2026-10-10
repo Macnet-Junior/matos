@@ -127,7 +127,7 @@ function EvidenceTab({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function persist(next: EvidenceLinkDTO[]) {
+  async function persist(next: EvidenceLinkDTO[]): Promise<boolean> {
     setBusy(true);
     setError(null);
     try {
@@ -145,8 +145,10 @@ function EvidenceTab({
       if (data.map && data.skill && onMapUpdate) {
         onMapUpdate(data.map, data.skill);
       }
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
+      return false;
     } finally {
       setBusy(false);
     }
@@ -157,12 +159,17 @@ function EvidenceTab({
     const nextLabel = label.trim();
     const nextUrl = url.trim();
     if (!nextLabel || !nextUrl) {
-      setError("Label and URL required");
+      setError("Evidence link needs a label and an address.");
       return;
     }
-    await persist([...skill.evidence, { label: nextLabel, url: nextUrl }]);
-    setLabel("");
-    setUrl("");
+    const saved = await persist([
+      ...skill.evidence,
+      { label: nextLabel, url: nextUrl },
+    ]);
+    if (saved) {
+      setLabel("");
+      setUrl("");
+    }
   }
 
   async function removeAt(index: number) {
@@ -234,6 +241,9 @@ function EvidenceTab({
             onChange={(e) => setUrl(e.target.value)}
             disabled={busy}
           />
+          <p className="text-[10px] leading-relaxed text-matos-muted2">
+            A web link or a knowledge file path. You can leave off https://.
+          </p>
           <Button type="submit" variant="secondary" disabled={busy}>
             {busy ? "Saving…" : "Add link"}
           </Button>
