@@ -14,11 +14,19 @@
  * least one delivery failed. The run itself never throws — a scheduler that
  * dies on an unhandled rejection stops delivering silently, which is the one
  * failure mode worse than a loud one.
+ *
+ * Do not call `process.exit()` after the tick. On Windows that aborts Node
+ * while undici keep-alive sockets or the Prisma engine are still closing,
+ * after this process has already printed its JSON. Shutdown records the exit
+ * code, disconnects Prisma, drains the global fetch dispatcher, and lets the
+ * event loop end. The only hard exit is an unref'd timer, and only if the
+ * process is still alive ~10s later.
  */
 import { ownerEmail } from "@/lib/rbac";
 import { runSchedulerTick } from "@/lib/desk/scheduler";
+import { schedulerExitCode, shutdownScheduler } from "@/lib/desk/scheduler-shutdown";
 
-async function main() {
+async function main(): Promise<number> {
   const tick = await runSchedulerTick({
     // The actor is the scheduler, not the owner. The owner's email is used only
     // as the account the run is filed under; stamping it as the actor would
@@ -43,14 +51,29 @@ async function main() {
     ),
   );
 
-  process.exit(tick.deliveries.failed > 0 ? 1 : 0);
+  return schedulerExitCode(tick.deliveries.failed);
 }
 
-main().catch((err) => {
+async function entry(): Promise<void> {
+  let code = 1;
+  try {
+    code = await main();
+  } catch (err) {
+    console.error(
+      JSON.stringify({
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
+    code = 1;
+  }
+  await shutdownScheduler(code);
+}
+
+entry().catch((err) => {
   console.error(
     JSON.stringify({
       error: err instanceof Error ? err.message : String(err),
     }),
   );
-  process.exit(1);
+  process.exitCode = 1;
 });
